@@ -1,4 +1,5 @@
 #include "customPrint.h"
+#include "config.h"
 
 void cursorUpOneLine(void) {
     printf("\033[F");  // move cursor up 1 line

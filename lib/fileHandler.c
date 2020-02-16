@@ -2,7 +2,9 @@
 
 #include "fileHandler.h"
 #include "time.h"
+#include "config.h"
 
+fileHandler_config_S g_SFileHandler_config;
 
 uint8_t bReadDevAddrFromFile(char *pszDevAddr) {
     FILE * fp;
@@ -43,55 +45,62 @@ void storeDevAddrToFile(char *pszDevAddr) {
 
     // Create new file or erase old file and create new one
     fp = fopen (UM34C_ADDR_FILE_NAME, "w");
-    fprintf(fp, "%s", pszDevAddr);
-   
-    fclose(fp);
+    if(fp != NULL) {
+        fprintf(fp, "%s", pszDevAddr);
+        fclose(fp);
+    }
 }
 
-void makeNewCSVfile(char *pszCSVfileName) {
+void makeNewCSVfile(fileHandler_config_S *pSConfig) {
     FILE * fp;
     time_t currentTime;
     struct tm *tm;
 
+    pSConfig->dwNumbOfAppends = 0;
+    
     currentTime = time(NULL);
     tm = localtime(&currentTime);
     // printf("strftime: %d\n\r", (strftime(g_SConfig.SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm)));
-    strftime(pszCSVfileName, UM34C_DATA_FILE_NAME_LEN, UM34C_DATA_FILE_NAME, tm);
-    printf("Creating file: %s\n\r", pszCSVfileName);
+    strftime(pSConfig->szCSVfileName, UM34C_DATA_FILE_NAME_LEN, UM34C_DATA_FILE_NAME, tm);
+    printf("Creating file: %s\n\r", pSConfig->szCSVfileName);
 
     // Create new file or erase old file and create new one
-    fp = fopen (pszCSVfileName, "w");
-    fprintf(fp, "%s", UM34C_DATA_CSV_HEADERS);
-   
-    fclose(fp);
+    fp = fopen(pSConfig->szCSVfileName, "w");
+    if(fp != NULL) {
+        fprintf(fp, "%s", UM34C_DATA_CSV_HEADERS);
+
+        pSConfig->bFileCreated_CSV = TRUE;
+        fclose(fp);
+    }
 }
 
-void appendToCSVfile(char *pszCSVfileName, um34c_data_S *pSData) {
+void appendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData) {
     FILE * fp;
+    #ifdef UM34C_NOT_IN_RANGE
     static float s_fTmp = 0;
+    #endif  // UM34C_NOT_IN_RANGE
 
+    if(pSConfig->bFileCreated_CSV == FALSE) {
+        makeNewCSVfile(pSConfig);
+    }
     // Create new file or erase old file and create new one
-    fp = fopen (pszCSVfileName, "a");
+    fp = fopen (pSConfig->szCSVfileName, "a");
 
     if(fp != NULL) {
-        // "Time;Voltage;Current;Power;Resistance;Temperature;mAh;mWh;\n"
-        // printf("Voltage: %0.2f V\n\r", data->fVoltage);
-        // printf("Current: %01.3f A\n\r", data->fCurrent);
-        // printf("Power: %0.3f W\n\r", data->fPower);
-        // printf("Resistance: %0.1f Ohm\n\r", data->fResistance);
-        // printf("Temperature: %d*C\n\r", data->byTemperatureC);
-        // printf("mAh: %d\n\r", data->wCapacity_mAh[data->bySelectedGroup]);
-	    // printf("mWh: %d\n\r", data->wCapacity_mWh[data->bySelectedGroup])
 
-
+        #ifdef UM34C_NOT_IN_RANGE
         s_fTmp += 1;
         pSData->fVoltage = s_fTmp;
+        #endif  // UM34C_NOT_IN_RANGE
+
+        // CSV headers: "Time;Voltage;Current;Power;Resistance;Temperature;mAh;mWh;\n"
         fprintf(fp, "%s;%0.2f;%01.3f;%0.3f;%0.1f;%d;%d;%d;\n", pSData->szTimeDate, 
                 pSData->fVoltage, pSData->fCurrent, pSData->fPower,
                 pSData->fResistance, pSData->byTemperatureC, 
                 pSData->wCapacity_mAh[pSData->bySelectedGroup],
                 pSData->wCapacity_mWh[pSData->bySelectedGroup]
                 );
+        pSConfig->dwNumbOfAppends++;
         // fprintf(fp, "%s;%0.2f;%01.3f;\n", pSData->szTimeDate, s_fTmp, s_fTmp);
     } else {
         printf("Failed to open CSV file!\n\r");
@@ -100,5 +109,23 @@ void appendToCSVfile(char *pszCSVfileName, um34c_data_S *pSData) {
     if(fp != NULL) {
         fclose(fp);
     }
+}
+
+long int getFileSize(char *pszFileName) {
+    FILE *fp;
+    long int size=0;
+     
+    // Open file in Read Mode
+    fp = fopen(pszFileName,"r");
+ 
+    if(fp != NULL) {
+        // Move file point at the end of file.
+        fseek(fp,0,SEEK_END);
+        
+        // Get the current position of the file pointer.
+        size = ftell(fp);
+    }
+
+    return size;
 }
 

@@ -18,17 +18,231 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <string.h>
+#include <ncurses.h>
 #include "customPrint.h"
+#include "config.h"
 
-int16_t convertStringToHex(char *cmd);
-uint8_t getNum(char ch);
 
-uint8_t g_bRequestData = FALSE;
+um34c_config_S g_SUM34C_config;
+uint8_t g_pbRequestData = FALSE;
 
-// https://github.com/sebastianha/um34c
-void decodeData(uint8_t *buf, um34c_data_S *data) {
+void UM34C_init(um34c_config_S *pSUM34C_config) {
+    if(pSUM34C_config != NULL) {
+    } else {
+        BREAKPOINT
+    }
+}
 
-    char *modes [] = {
+void UM34C_deinit(um34c_config_S *pSUM34C_config) {
+    if(pSUM34C_config != NULL) {
+        close(pSUM34C_config->nSocketHandle);
+    } else {
+        BREAKPOINT
+    }
+}
+
+uint8_t bGetDestDevAddr(char *pszUM34CAddress) {
+    inquiry_info *ii = NULL;
+    int max_rsp, num_rsp;
+    int dev_id, sock, len, flags;
+    int i;
+    char addr[19] = { 0 };
+    char name[248] = { 0 };
+    uint8_t bUM34CdeviceFound = FALSE;
+
+    // dev_id = connectToBtAddapter();
+    // Get bluetooth adapter ID
+    printf("Getting bluetooth adapter ID... ");
+    dev_id = hci_get_route(NULL);
+    // dev_id = hci_devid( "01:23:45:67:89:AB" );  // connect to specific adapter
+    printf("ID: %d\n\r", dev_id);
+
+    // Connect to adapter 
+    printf("Connecting to adapter... ");
+    sock = hci_open_dev( dev_id );  // connection to the microcontroller on the specified local Bluetooth adapter
+    if (dev_id < 0 || sock < 0) {
+        perror("opening socket");
+        exit(1);
+    } else {
+        printf("done\n\r");
+    }
+
+    // scan for nearby Bluetooth devices
+    len  = 8;  // The inquiry lasts for at most 1.28 * 'len' seconds
+    max_rsp = 255;  // max number of returned devices
+    flags = IREQ_CACHE_FLUSH;  // cache of previously detected devices is flushed before performing the current inquiry
+    // flags = 0;  // cache of previously detected devices is flushed before performing the current inquiry
+    printf("malloc... ");
+    ii = (inquiry_info*)malloc(max_rsp * sizeof(inquiry_info));  // in 'ii' deteceted devices data is returned, must support max number of devices ('max_rsp')
+    printf("done\n");
+
+    printf("Scanning for nearby devices... ");
+    num_rsp = hci_inquiry(dev_id, len, max_rsp, NULL, &ii, flags);
+    if( num_rsp < 0 ) {
+        perror("hci_inquiry");
+    } else {
+        printf("done\n\r");
+    }
+    printf("Number of detected devices: %d\n\r", num_rsp);
+
+    for (i = 0; i < num_rsp; i++) {
+        ba2str(&(ii+i)->bdaddr, addr);
+        memset(name, 0, sizeof(name));
+        // Try to get user-friendly name
+        if (hci_read_remote_name(sock, &(ii+i)->bdaddr, sizeof(name), name, 0) < 0) {
+            strcpy(name, "[unknown]");
+        }
+        printf("%s  %s\n", addr, name);
+        if(strcmp(name, "UM34C") == 0) {
+        // if(strcmp(name, "[unknown]") == 0) {
+            printf("Address noted\n\r");
+            strncpy(pszUM34CAddress, addr, UM34C_ADDR_LEN);
+            bUM34CdeviceFound = TRUE;
+        }
+    }
+
+    free( ii );
+    close(sock);
+
+    return bUM34CdeviceFound;
+}
+
+uint8_t bConnectToBtAddapter(um34c_config_S *pSUM34C_config) {
+    uint8_t bRetVal = FALSE;
+    struct sockaddr_rc SSocketAddr;
+
+    if(pSUM34C_config != NULL) {
+        // Allocate a socket
+        printf("Allocating socket...");
+        pSUM34C_config->nSocketHandle = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
+        if(pSUM34C_config->nSocketHandle == -1) {
+            printf(" FAILED\n\r");
+        } else {
+            printf(" done\n\r");
+            // Set the connection parameters (who to connect to)
+            SSocketAddr.rc_family = AF_BLUETOOTH;
+            SSocketAddr.rc_channel = (uint8_t) 1;
+            for(uint8_t i=0; i < sizeof(bdaddr_t); i++) {
+                SSocketAddr.rc_bdaddr.b[i] =  pSUM34C_config->abyDestDevAddr.b[i];
+            }
+
+            // Connect to server
+            printf("Connecting to socket...");
+            pSUM34C_config->nStatus = connect(pSUM34C_config->nSocketHandle, (struct sockaddr *)&SSocketAddr, UM34C_ADDR_LEN);
+            if(pSUM34C_config->nStatus == 0) {
+                printf(" done\n\r");
+                bRetVal = TRUE;
+            } else {
+                printf(" FAILED\n\r");
+            }
+        }
+
+    } else {
+        BREAKPOINT
+    }
+
+    return bRetVal;
+}
+
+// http://www.informit.com/articles/article.aspx?p=23618&seqNum=14
+void createTimer(um34c_config_S *pSUM34C_config) {
+    struct sigaction sa;
+    struct itimerval timer;
+
+    if(pSUM34C_config != NULL) {
+        /* Install timer_handler as the signal handler for SIGVTALRM. */
+        printf("Installing timer handler\n\r");
+        memset (&sa, 0, sizeof (sa));
+        sa.sa_handler = &timer_handler;
+        // sigaction(SIGVTALRM, &sa, NULL);
+        sigaction(SIGALRM, &sa, NULL);
+
+        printf("Setting timer...");
+        timer.it_value.tv_sec = 0;
+        timer.it_value.tv_usec = pSUM34C_config->dwTimerInterval;
+        timer.it_interval.tv_sec = 0;
+        timer.it_interval.tv_usec = pSUM34C_config->dwTimerInterval;
+        /* Start a virtual timer. It counts down whenever this process is
+         * executing. 
+         * ITIMER_REAL -> delivers SIGALRM upon expiration
+         * ITIMER_VIRTUAL -> delivers SIGVTALRM upon expiration
+         * ITIMER_PROF -> delivers SIGPROF upon expiration
+         */
+        // if(setitimer(ITIMER_VIRTUAL, &timer, NULL) == -1) {
+        if(setitimer(ITIMER_REAL, &timer, NULL) == -1) {
+            printf(" FAILED\n\r");
+        } else {
+            printf(" done\n\r");
+        }
+
+        // Connect timer expired flag
+        pSUM34C_config->pbRequestData = &g_pbRequestData;
+    } else {
+        BREAKPOINT
+    }
+}
+
+void timer_handler (int signum) {
+    if(signum == SIGALRM) {
+        g_pbRequestData = TRUE;
+    }
+}
+
+uint8_t bUM34C_getData(um34c_config_S *pSConfig) {
+    uint8_t abyBuff[UM34C_MSG_SIZE] = {0};
+    time_t currentTime;
+    struct tm *tm;
+    uint8_t bRetVal = FALSE;
+
+    // Send query
+    UM34C_sendCmd(pSConfig->nSocketHandle, um34c_cmd_getData, &pSConfig->nStatus);
+    if(pSConfig->nStatus == UM34C_SEND_CMD_SIZE) {
+        // Data sent successfully, now read data from device
+        // printf("Reading device...\n\r");
+        UM34C_readCmd(pSConfig->nSocketHandle, abyBuff, UM34C_MSG_SIZE, &pSConfig->nStatus);
+        // Check if data was received correctly (first 4 chars should be '0d4c' and 'UM34C_MSG_SIZE' bytes should be received)
+        // printf("Read %d bytes\n\r", pSConfig->nStatus);    
+        if(abyBuff[0] == '0' && abyBuff[1] == 'd' && abyBuff[2] == '4' && abyBuff[3] == 'c' && pSConfig->nStatus == UM34C_MSG_SIZE) {
+            currentTime = time(NULL);
+            tm = localtime(&currentTime);
+            strftime(pSConfig->SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm);
+            // printf("date: %s\n\r", pSConfig->SCurrentData.szTimeDate);
+            UM34C_decodeData(abyBuff, &pSConfig->SCurrentData);
+            bRetVal = TRUE;
+        } else {
+            printf("Error on receiving data from UM34C (received %d bytes)\n\r", pSConfig->nStatus);
+        }
+    } else {
+        printf("Error on sending data to UM34C");
+    }
+    
+    // for(i=0; i<UM34C_MSG_SIZE; i++) {
+    //     printf("  0x%02X", buff[i]);
+    //     if((i+1) % 16 == 0) {
+    //         printf("\n\r");
+    //     }
+    // }
+    // printf("\n\r");
+
+    return bRetVal;
+}
+
+// If 'UM34C_SEND_CMD_SIZE' is returned everything is OK
+void UM34C_sendCmd(int nSocketHandle, uint8_t byBuffSend, int *pnStatus) {
+    *pnStatus = write(nSocketHandle, (void*)&byBuffSend, UM34C_SEND_CMD_SIZE);
+}
+
+// Retrun value must be the same as 'size'
+void UM34C_readCmd(int nSocketHandle, uint8_t *pabyBuff, size_t size, int *pnStatus) {
+    *pnStatus = read(nSocketHandle, pabyBuff, size);
+}
+
+void UM34C_prettyPrintData(um34c_data_S *pSData) {
+    uint16_t wX = 0;
+    uint16_t wY = 0;
+    uint16_t wXOffset = 50;
+    uint16_t wYOffset = 0;
+    char *pszModes [] = {
 		"Unknown",  // 0
 		"QC2.0",    // 1
 		"QC3.0",    // 2
@@ -39,102 +253,70 @@ void decodeData(uint8_t *buf, um34c_data_S *data) {
 		"DCP1.5A",  // 7
 		"SAMSUNG"   // 8
     };
+    
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Current data:");
+    wX += 4;
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Time: %s\n\r", pSData->szTimeDate);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Voltage: %0.2f V\n\r", pSData->fVoltage);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Current: %01.3f A\n\r", pSData->fCurrent);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Power: %0.3f W\n\r", pSData->fPower);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Resistance: %0.1f Ohm\n\r", pSData->fResistance);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Temperature: %d*C\n\r", pSData->byTemperatureC);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Selected group: %d\n\r", pSData->bySelectedGroup);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Capacity [mAh]: %d\n\r", pSData->wCapacity_mAh[pSData->bySelectedGroup]);
+	mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Capacity [mWh]: %d\n\r", pSData->wCapacity_mWh[pSData->bySelectedGroup]);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Current screen: %d\n\r", pSData->byCurrentScreen);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Brightness: %d\n\r", pSData->byBrightness);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Screen timeout: %d\n\r", pSData->byScreenTimeout);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "USB + data line: %0.2f\n\r", pSData->fUsbDataPlus);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "USB - data line: %0.2f\n\r", pSData->fUsbDataMinus);
+    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Charging mode: %s\n\r", pszModes[pSData->byChargingMode]);
+    // for(uint8_t g=0; g<10; g++) {
+	// 	printf("  %d  mAh: %d", g, pSData->mAh[g]);
+	// 	printf("  mWh: %d\n\r", pSData->mWh[g]);
+	// }
+}
+
+// https://github.com/sebastianha/um34c
+void UM34C_decodeData(uint8_t *buf, um34c_data_S *pSData) {
 
     /* Data from device
-	 *      4    8    12   16   20   24   28   32   36   40   44   48   52   56   60
+	 * 0    2    4    6    8    10   12   14   16   18   20   22   24   26   28   30
 	 * 0d4c 01f5 008e 0000 02c7 001b 0051 0001 0000 0000 0000 0000 0000 0007 0000 0027 
 	 *      V___ A___ W________ tC__ tF__ grou mAh_0____ mWh_0____ mAh_1____ mWh_1____
 	 * 
-	 * 64   68   72   76   80   84   88   92   96   100  104  108  112  116  120  124
+	 * 32   34   36   38   40   42   44   46   48   50   52   54   56   58   60   62
 	 * 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
 	 * mAh_2____ mWh_2____ mAh_3____ mWh_3____ mAh_4____ mWh_4____ mAh_5____ mWh_5____ 
 	 * 
-	 * 128  132  136  140  144  148  152  156  160  164  168  172  176  180  184  188
+	 * 64   66   68   70   72   74   76   78   80   82   84   86   88   90   92   94
 	 * 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 
 	 * mAh_6____ mWh_6____ mAh_7____ mWh_7____ mAh_8____ mWh_8____ mAh_9____ mWh_9____
 	 * 
-	 * 192  196  200  204  208  212  216  220  224  228  232  236  240  244  248  252  256
+	 * 96   98   100  102  104  106  108  110  112  114  116  118  120  124  126  128  130
 	 * 0002 0001 0007 0000 0007 0000 0025 0013 0000 0046 0000 0001 0004 0000 0160 0000 8068
 	 * d+__ d-__ mode recA_____ recW_____ recT recTime__ con? tout brig ohm______ scre
 	 */
     // Voltage in "V"
-	data->fVoltage = ((buf[2] << 8) + buf[3]) / 100.0;
-	data->fCurrent = ((buf[4] << 8) + buf[5]) / 1000.0;
-	data->fPower = ((buf[6] << 8*3) + (buf[7] << 8*2) + (buf[8] << 8*1) + (buf[9] << 8*0)) / 1000.0;
- 	data->byTemperatureC = ((buf[10] << 8) + buf[11]);
-    data->bySelectedGroup = (buf[14] << 8) + buf[15];
-	data->fResistance = ((buf[122] << 8*3) + (buf[123] << 8*2) + (buf[124] << 8*1) + (buf[125] << 8*0)) / 10.0;
-    data->byCurrentScreen = (buf[126] << 8) + buf[127];
-    data->byBrightness = (buf[118] << 8) + buf[119];
-    data->byScreenTimeout = (buf[120] << 8) + buf[121];
+	pSData->fVoltage = ((buf[2] << 8) + buf[3]) / 100.0;
+	pSData->fCurrent = ((buf[4] << 8) + buf[5]) / 1000.0;
+	pSData->fPower = ((buf[6] << 8*3) + (buf[7] << 8*2) + (buf[8] << 8*1) + (buf[9] << 8*0)) / 1000.0;
+ 	pSData->byTemperatureC = ((buf[10] << 8) + buf[11]);
+    pSData->bySelectedGroup = (buf[14] << 8) + buf[15];
+    pSData->fUsbDataPlus = ((buf[96] << 8) + buf[97]) / 100.0;
+    pSData->fUsbDataMinus = ((buf[98] << 8) + buf[99]) / 100.0;
+    pSData->byChargingMode = (buf[100] << 8) + buf[101];
+    pSData->byScreenTimeout = (buf[118] << 8) + buf[119];
+    pSData->byBrightness = (buf[120] << 8) + buf[121];
+	pSData->fResistance = ((buf[122] << 8*3) + (buf[123] << 8*2) + (buf[124] << 8*1) + (buf[125] << 8*0)) / 10.0;
+    pSData->byCurrentScreen = (buf[126] << 8) + buf[127];
 
     // Fill groups with data
 	for(uint8_t g=0; g<10; g++) {
-		data->wCapacity_mAh[g] = (buf[16+8*g] << 8*3) + (buf[17+8*g] << 8*2) + (buf[18+8*g] << 8*1) + (buf[19+8*g] << 8*0);
-		data->wCapacity_mWh[g] = (buf[20+8*g] << 8*3) + (buf[21+8*g] << 8*2) + (buf[22+8*g] << 8*1) + (buf[23+8*g] << 8*0);
+		pSData->wCapacity_mAh[g] = (buf[16+8*g] << 8*3) + (buf[17+8*g] << 8*2) + (buf[18+8*g] << 8*1) + (buf[19+8*g] << 8*0);
+		pSData->wCapacity_mWh[g] = (buf[20+8*g] << 8*3) + (buf[21+8*g] << 8*2) + (buf[22+8*g] << 8*1) + (buf[23+8*g] << 8*0);
 	}
-
-
-
-    cursorUpLinesClear(11);
-    deleteLine();
-    printf("Voltage: %0.2f V\n\r", data->fVoltage);
-    printf("Current: %01.3f A\n\r", data->fCurrent);
-    printf("Power: %0.3f W\n\r", data->fPower);
-    printf("Resistance: %0.1f Ohm\n\r", data->fResistance);
-    printf("Temperature: %d*C\n\r", data->byTemperatureC);
-    printf("Selected group: %d\n\r", data->bySelectedGroup);
-    printf("mAh: %d\n\r", data->wCapacity_mAh[data->bySelectedGroup]);
-	printf("mWh: %d\n\r", data->wCapacity_mWh[data->bySelectedGroup]);
-    printf("Current screen: %d\n\r", data->byCurrentScreen);
-    printf("Brightness: %d\n\r", data->byBrightness);
-    printf("Screen timeout: %d\n\r", data->byScreenTimeout);
-    // for(uint8_t g=0; g<10; g++) {
-	// 	printf("  %d  mAh: %d", g, data->mAh[g]);
-	// 	printf("  mWh: %d\n\r", data->mWh[g]);
-	// }
-
 }
-
-// http://www.informit.com/articles/article.aspx?p=23618&seqNum=14
-uint8_t * createTimer(uint32_t dwInterval) {
-    struct sigaction sa;
-    struct itimerval timer;
-
-    /* Install timer_handler as the signal handler for SIGVTALRM. */
-    printf("Installing timer handler\n\r");
-    memset (&sa, 0, sizeof (sa));
-    sa.sa_handler = &timer_handler;
-    // sigaction(SIGVTALRM, &sa, NULL);
-    sigaction(SIGALRM, &sa, NULL);
-
-    printf("Setting timer...");
-    timer.it_value.tv_sec = 0;
-    timer.it_value.tv_usec = dwInterval;
-    timer.it_interval.tv_sec = 0;
-    timer.it_interval.tv_usec = dwInterval;
-    /* Start a virtual timer. It counts down whenever this process is
-     * executing. 
-     * ITIMER_REAL -> delivers SIGALRM upon expiration
-     * ITIMER_VIRTUAL -> delivers SIGVTALRM upon expiration
-     * ITIMER_PROF -> delivers SIGPROF upon expiration
-     */
-    // if(setitimer(ITIMER_VIRTUAL, &timer, NULL) == -1) {
-    if(setitimer(ITIMER_REAL, &timer, NULL) == -1) {
-        printf(" FAILED\n\r");
-    } else {
-        printf(" done\n\r");
-    }
-
-    return &g_bRequestData;
-}
-
-void timer_handler (int signum) {
-    if(signum == SIGALRM) {
-        g_bRequestData = TRUE;
-    }
-}
-
 
 uint8_t getNum(char ch) {
     uint8_t returnVal = 255;  // 255 is error value
@@ -189,122 +371,3 @@ int16_t convertStringToHex(char *cmd) {
 
     return convertedVal[0];
 }
-
-uint8_t bGetDestDevAddr(char *pszUM34CAddress) {
-    inquiry_info *ii = NULL;
-    int max_rsp, num_rsp;
-    int dev_id, sock, len, flags;
-    int i;
-    char addr[19] = { 0 };
-    char name[248] = { 0 };
-    uint8_t bUM34CdeviceFound = FALSE;
-
-    // dev_id = connectToBtAddapter();
-    // Get bluetooth adapter ID
-    printf("Getting bluetooth adapter ID... ");
-    dev_id = hci_get_route(NULL);
-    // dev_id = hci_devid( "01:23:45:67:89:AB" );  // connect to specific adapter
-    printf("ID: %d\n\r", dev_id);
-
-    // Connect to adapter 
-    printf("Connecting to adapter... ");
-    sock = hci_open_dev( dev_id );  // connection to the microcontroller on the specified local Bluetooth adapter
-    if (dev_id < 0 || sock < 0) {
-        perror("opening socket");
-        exit(1);
-    } else {
-        printf("done\n\r");
-    }
-
-    //  scan for nearby Bluetooth devices
-    len  = 8;  // The inquiry lasts for at most 1.28 * 'len' seconds
-    max_rsp = 255;  // max number of returned devices
-    flags = IREQ_CACHE_FLUSH;  // cache of previously detected devices is flushed before performing the current inquiry
-    // flags = 0;  // cache of previously detected devices is flushed before performing the current inquiry
-    printf("malloc... ");
-    ii = (inquiry_info*)malloc(max_rsp * sizeof(inquiry_info));  // in 'ii' deteceted devices data is returned, must support max number of devices ('max_rsp')
-    printf("done\n");
-
-    printf("Scanning for nearby devices... ");
-    num_rsp = hci_inquiry(dev_id, len, max_rsp, NULL, &ii, flags);
-    if( num_rsp < 0 ) {
-        perror("hci_inquiry");
-    } else {
-        printf("done\n\r");
-    }
-    printf("Number of detected devices: %d\n\r", num_rsp);
-
-    for (i = 0; i < num_rsp; i++) {
-        ba2str(&(ii+i)->bdaddr, addr);
-        memset(name, 0, sizeof(name));
-        // Try to get user-friendly name
-        if (hci_read_remote_name(sock, &(ii+i)->bdaddr, sizeof(name), name, 0) < 0) {
-            strcpy(name, "[unknown]");
-        }
-        printf("%s  %s\n", addr, name);
-        if(strcmp(name, "UM34C") == 0) {
-        // if(strcmp(name, "[unknown]") == 0) {
-            printf("Address noted\n\r");
-            strncpy(pszUM34CAddress, addr, UM34C_ADDR_LEN);
-            bUM34CdeviceFound = TRUE;
-        }
-    }
-
-    free( ii );
-    close(sock);
-
-    // int dev_id;
-
-    // // Get bluetooth adapter ID
-    // printf("Getting bluetooth adapter ID... ");
-    // dev_id = hci_get_route(NULL);
-    // // dev_id = hci_devid( "01:23:45:67:89:AB" );  // connect to specific adapter
-    // printf("ID: %d\n\r", dev_id);
-
-    // // Connect to adapter 
-    // printf("Connecting to adapter... ");
-    // sock = hci_open_dev( dev_id );  // connection to the microcontroller on the specified local Bluetooth adapter
-    // if (dev_id < 0 || sock < 0) {
-    //     perror("opening socket");
-    //     exit(1);
-    // } else {
-    //     printf("done\n\r");
-    // }
-    return bUM34CdeviceFound;
-}
-
-uint8_t bConnectToBtAddapter(int *pnSocketHandle, bdaddr_t *pabyDestDevAddr, int *pnStatus) {
-    struct sockaddr_rc SSocketAddr;
-
-    // Allocate a socket
-    printf("Allocating socket...");
-    *pnSocketHandle = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
-    if(*pnSocketHandle == -1) {
-        printf(" FAILED\n\r");
-        return 1;
-    } else {
-        printf(" done\n\r");
-    }
-
-    // Set the connection parameters (who to connect to)
-    SSocketAddr.rc_family = AF_BLUETOOTH;
-    SSocketAddr.rc_channel = (uint8_t) 1;
-    for(uint8_t i=0; i < sizeof(bdaddr_t); i++) {
-        SSocketAddr.rc_bdaddr.b[i] = pabyDestDevAddr->b[i];
-    }
-
-    // Connect to server
-    printf("Connecting to socket...");
-    *pnStatus = connect(*pnSocketHandle, (struct sockaddr *)&SSocketAddr, UM34C_ADDR_LEN);
-    if(*pnStatus == 0) {
-        printf(" done\n\r");
-    } else {
-        printf(" FAILED\n\r");
-        return 1;
-    }
-
-    return 0;
-}
-
-
-

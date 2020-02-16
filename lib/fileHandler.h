@@ -10,10 +10,18 @@
 // #define UM34C_DATA_CSV_HEADERS "Time;Voltage;Current;\n"
 #define UM34C_DATA_CSV_HEADERS "Time;Voltage;Current;Power;Resistance;Temperature;mAh;mWh;\n"
 
+typedef struct  {
+    char szCSVfileName[UM34C_DATA_FILE_NAME_LEN];
+    uint32_t dwNumbOfAppends;
+    uint8_t bFileCreated_CSV;
+} fileHandler_config_S;
+
+
 uint8_t bReadDevAddrFromFile(char *pszDevAddr);
 void storeDevAddrToFile(char *pszDevAddr);
-void makeNewCSVfile(char *pszCSVfileName);
-void appendToCSVfile(char *pszCSVfileName, um34c_data_S *pSData);
+void makeNewCSVfile(fileHandler_config_S *pSConfig);
+void appendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData);
+long int getFileSize(char *pszFileName);
 
 
 #endif  // __fileHandler_h
