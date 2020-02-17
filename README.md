@@ -11,7 +11,7 @@ It was tested on Ubuntu 18.04.
 `sudo apt install libncurses5-dev`
 3. Install make:  
 `sudo apt install make`
-4. Install gcc:
+4. Install gcc:  
 `sudo apt install gcc`
 5. Open root folder of this project and build application:  
 `make`
