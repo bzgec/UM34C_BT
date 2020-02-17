@@ -5,11 +5,15 @@ It was tested on Ubuntu 18.04.
 ![alt text](um34c.jpg "Logo Title Text 1")
 
 # Install
-1. Install bluetooth driver:  
+1. Install bluetooth library:  
 `sudo apt install libbluetooth-dev`
-2. Install make:  
+2. Install ncurses library:  
+`sudo apt install libncurses5-dev`
+3. Install make:  
 `sudo apt install make`
-3. Open root folder of this project and build application:  
+4. Install gcc:
+`sudo apt install gcc`
+5. Open root folder of this project and build application:  
 `make`
 
 # Usage

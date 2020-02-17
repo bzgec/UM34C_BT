@@ -19,8 +19,8 @@ typedef struct  {
 
 uint8_t bReadDevAddrFromFile(char *pszDevAddr);
 void storeDevAddrToFile(char *pszDevAddr);
-void makeNewCSVfile(fileHandler_config_S *pSConfig);
-void appendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData);
+uint8_t bMakeNewCSVfile(fileHandler_config_S *pSConfig);
+uint8_t byAppendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData);
 long int getFileSize(char *pszFileName);
 
 

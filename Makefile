@@ -20,7 +20,7 @@ LDIR := lib
 # Compiler to use
 CC=gcc
 # Compiler flags
-CFLAGS=-I$(IDIR) -I$(LDIR) -I./ -O0
+CFLAGS=-I$(IDIR) -I$(LDIR) -I./ -O0 -g3
 # Linker flags (Search the bluetooth named library when linking)
 LDFLAGS = -lbluetooth -lpthread -lncurses
 

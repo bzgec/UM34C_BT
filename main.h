@@ -11,6 +11,13 @@
 #define INTREVAL_CHECK_FOR_CHAR (20*1000)  // [us]
 #define INTREVAL_UPDATE_DISPLAY (50*1000)  // [us]
 
+// ncurses color pair index
+#define GREEN_PAIR  1
+#define RED_PAIR    2
+#define DEFAULT_CLR (-1)  // default terminal color
+
+#define LOGGER_FILE_NAME "log.log"
+
 typedef struct {
     um34c_config_S *pSUM34C_config;
     fileHandler_config_S *pSFileHandler_config;
@@ -22,5 +29,7 @@ typedef struct {
     uint8_t byDeviceBrightness;
     uint8_t byCurrentScreenRotation;
 } mainConfig_S;
+
+void exitProgram(void);
 
 #endif  // __main_h

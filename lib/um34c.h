@@ -15,6 +15,7 @@
 
 #define DATE_TIME_STRING_FORMAT "%H:%M:%S %d/%m/%Y"
 #define DATE_TIME_STRING_SIZE   20
+#define DATE_TIME_STRING_INIT   "no data yet"
 
 #define UM34C_SEND_CMD_SIZE 1
 
@@ -92,7 +93,7 @@ typedef struct {
     int nStatus;
     uint32_t dwTimerInterval;
     um34c_data_S SCurrentData;
-    uint8_t *pbRequestData;
+    uint8_t *pbRequestData;  // Needed only if timer is used
     char szDestDevAddr[UM34C_ADDR_LEN];
     bdaddr_t abyDestDevAddr;
 } um34c_config_S;
@@ -104,17 +105,15 @@ typedef struct {
 
 void UM34C_init(um34c_config_S *pSUM34C_config);
 void UM34C_deinit(um34c_config_S *pSUM34C_config);
-uint8_t bGetDestDevAddr(char *szUM34CAddress);
-uint8_t bConnectToBtAddapter(um34c_config_S *pSUM34C_config);
+uint8_t UM34C_bGetDestDevAddr(char *szUM34CAddress);
+uint8_t UM34C_bConnectToBtAddapter(um34c_config_S *pSUM34C_config);
 void createTimer(um34c_config_S *pSUM34C_config);
 void timer_handler (int signum);
-uint8_t bUM34C_getData(um34c_config_S *pSConfig);
+uint8_t UM34C_bGetData(um34c_config_S *pSConfig);
 void UM34C_sendCmd(int nSocketHandle, uint8_t byBuffSend, int *pnStatus);
 void UM34C_readCmd(int nSocketHandle, uint8_t *pabyBuff, size_t size, int *pnStatus);
-void UM34C_prettyPrintData(um34c_data_S *pSData);
+void UM34C_prettyPrintData(um34c_data_S *pSData, uint8_t bUseNcurses);
 void UM34C_decodeData(uint8_t *buf, um34c_data_S *pSData);
-int16_t convertStringToHex(char *cmd);
-uint8_t getNum(char ch);
 
 
 

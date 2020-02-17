@@ -3,6 +3,7 @@
 #include "fileHandler.h"
 #include "time.h"
 #include "config.h"
+#include "logger.h"
 
 fileHandler_config_S g_SFileHandler_config;
 
@@ -26,11 +27,7 @@ uint8_t bReadDevAddrFromFile(char *pszDevAddr) {
         pszDevAddr[i] = '\0';
         if(i == UM34C_ADDR_LEN-1) {
             bAddressStoredInFile = TRUE;
-            // printf("Address read from file: %s\n\r", pszDevAddr);
-        } else {
-            printf("Address stored in file is corrupted\n\r");
-        }
-        
+        }        
     }
 
     if(fp != NULL) {
@@ -51,18 +48,17 @@ void storeDevAddrToFile(char *pszDevAddr) {
     }
 }
 
-void makeNewCSVfile(fileHandler_config_S *pSConfig) {
+uint8_t bMakeNewCSVfile(fileHandler_config_S *pSConfig) {
     FILE * fp;
     time_t currentTime;
     struct tm *tm;
+    uint8_t bRetVal = FALSE;
 
     pSConfig->dwNumbOfAppends = 0;
     
     currentTime = time(NULL);
     tm = localtime(&currentTime);
-    // printf("strftime: %d\n\r", (strftime(g_SConfig.SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm)));
     strftime(pSConfig->szCSVfileName, UM34C_DATA_FILE_NAME_LEN, UM34C_DATA_FILE_NAME, tm);
-    printf("Creating file: %s\n\r", pSConfig->szCSVfileName);
 
     // Create new file or erase old file and create new one
     fp = fopen(pSConfig->szCSVfileName, "w");
@@ -70,18 +66,25 @@ void makeNewCSVfile(fileHandler_config_S *pSConfig) {
         fprintf(fp, "%s", UM34C_DATA_CSV_HEADERS);
 
         pSConfig->bFileCreated_CSV = TRUE;
+        bRetVal = TRUE;
         fclose(fp);
     }
+
+    return bRetVal;
 }
 
-void appendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData) {
+// Retrun value: 0-ERROR, 1-OK, 2-FILE CREATED ('2' has precedence)
+uint8_t byAppendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData) {
     FILE * fp;
+    uint8_t byRetVal = 0;
     #ifdef UM34C_NOT_IN_RANGE
     static float s_fTmp = 0;
     #endif  // UM34C_NOT_IN_RANGE
 
     if(pSConfig->bFileCreated_CSV == FALSE) {
-        makeNewCSVfile(pSConfig);
+        if(bMakeNewCSVfile(pSConfig) == TRUE) {
+            byRetVal = 2;
+        }
     }
     // Create new file or erase old file and create new one
     fp = fopen (pSConfig->szCSVfileName, "a");
@@ -101,14 +104,18 @@ void appendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData) {
                 pSData->wCapacity_mWh[pSData->bySelectedGroup]
                 );
         pSConfig->dwNumbOfAppends++;
-        // fprintf(fp, "%s;%0.2f;%01.3f;\n", pSData->szTimeDate, s_fTmp, s_fTmp);
-    } else {
-        printf("Failed to open CSV file!\n\r");
+
+        // Check if file was created
+        if(byRetVal != 2) {
+            byRetVal = 1;
+        }
     }
 
     if(fp != NULL) {
         fclose(fp);
     }
+
+    return byRetVal;
 }
 
 long int getFileSize(char *pszFileName) {
