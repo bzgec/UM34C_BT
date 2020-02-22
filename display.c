@@ -65,7 +65,7 @@ void *threadDisplayStuff(void *arg) {
 
     uint16_t wX;
     uint16_t wY;
-    char szLastCmdBuff[40];
+    char szLastCmdBuff[40] = "No command yet";
     
     while(1) {
         wX = 0;
