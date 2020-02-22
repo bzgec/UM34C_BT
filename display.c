@@ -55,7 +55,7 @@ void *threadDisplayStuff(void *arg) {
         endwin();  // dellocates memory and ends ncurses
         printf("Your terminal does not support color\n\r");
         logger(log_lvl_error, "display", "Your terminal does not support color");
-        exitProgram();
+        exitProgram(exitProgram_param_terminalColor);
     } else {
         use_default_colors();
         start_color();
@@ -116,7 +116,7 @@ void *threadDisplayStuff(void *arg) {
                     sprintf(szLastCmdBuff, "Next display");
                     break;
                 case 'c':  // Exit program
-                    exitProgram();
+                    exitProgram(exitProgram_param_C);
                     break;
                 case 0x20:  // Toggle data sampling - 'space'
                     g_SConfig.bReadData = !g_SConfig.bReadData;

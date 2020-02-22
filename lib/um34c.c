@@ -22,6 +22,7 @@
 #include "customPrint.h"
 #include "config.h"
 #include "logger.h"
+#include "main.h"
 
 static int16_t fs_sConvertStringToHex(char *cmd);
 static uint8_t fs_byGetNum(char ch);
@@ -35,6 +36,7 @@ void UM34C_init(um34c_config_S *pSUM34C_config) {
         strcpy(pSUM34C_config->SCurrentData.szTimeDate, DATE_TIME_STRING_INIT);  // Clear date time string
         pSUM34C_config->dwTimerInterval = UM34C_INTERVAL_DEFAULT;  // Set interval at which data from UM34C is read to default
         pSUM34C_config->bInitialized = TRUE;
+        pSUM34C_config->byErrSend = 0;
     } else {
         BREAKPOINT
     }
@@ -233,20 +235,27 @@ uint8_t UM34C_bGetData(um34c_config_S *pSConfig) {
         UM34C_readCmd(pSConfig->nSocketHandle, abyBuff, UM34C_MSG_SIZE, &pSConfig->nStatus);
         // Check if data was received correctly (first 4 chars should be '0d4c' and 'UM34C_MSG_SIZE' bytes should be received)
         // printf("Read %d bytes\n\r", pSConfig->nStatus);    
-        if(abyBuff[0] == '0' && abyBuff[1] == 'd' && abyBuff[2] == '4' && abyBuff[3] == 'c' && pSConfig->nStatus == UM34C_MSG_SIZE) {
+        // if(abyBuff[0] == '0' && abyBuff[1] == 'd' && abyBuff[2] == '4' && abyBuff[3] == 'c' && pSConfig->nStatus == UM34C_MSG_SIZE) {
+        // if(abyBuff[0] == 13 && abyBuff[1] == 76 && abyBuff[2] == 1 && abyBuff[3] == 255 && pSConfig->nStatus == UM34C_MSG_SIZE) {
+        if(abyBuff[0] == 13 && abyBuff[1] == 76 && abyBuff[2] == 1 && pSConfig->nStatus == UM34C_MSG_SIZE) {
             currentTime = time(NULL);
             tm = localtime(&currentTime);
             strftime(pSConfig->SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm);
             // printf("date: %s\n\r", pSConfig->SCurrentData.szTimeDate);
             UM34C_decodeData(abyBuff, &pSConfig->SCurrentData);
+            pSConfig->byErrSend = 0;
             bRetVal = TRUE;
         } else {
-            printf("Error on receiving data from UM34C (received %d bytes)\n\r", pSConfig->nStatus);
+            // printf("Error on receiving data from UM34C (received %d bytes)\n\r", pSConfig->nStatus);
             logger(log_lvl_error, "um34c", "Error on receiving data from UM34C (received %d bytes)", pSConfig->nStatus);
         }
     } else {
-        printf("Error on sending data to UM34C");
+        // printf("Error on sending data to UM34C");
         logger(log_lvl_error, "um34c", "Error on sending data to UM34C");
+        if(pSConfig->byErrSend++ > UM34C_MAX_SEND_ERR_NUMB) {
+            logger(log_lvl_error, "um34c", "Connection to UM34C is probably lost, exiting application");
+            exitProgram(exitProgram_param_SendingUM34C);
+        }
     }
     
     // for(i=0; i<UM34C_MSG_SIZE; i++) {

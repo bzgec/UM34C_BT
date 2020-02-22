@@ -19,6 +19,10 @@
 
 #define UM34C_SEND_CMD_SIZE 1
 
+// if x times in a row there is error on sending data exit application
+// there is probably error on connection with UM34C
+#define UM34C_MAX_SEND_ERR_NUMB  10
+
 
 
 
@@ -96,6 +100,7 @@ typedef struct {
     uint8_t *pbRequestData;  // Needed only if timer is used
     char szDestDevAddr[UM34C_ADDR_LEN];
     bdaddr_t abyDestDevAddr;
+    uint8_t byErrSend;
 } um34c_config_S;
 
 

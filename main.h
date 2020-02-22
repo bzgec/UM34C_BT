@@ -30,6 +30,15 @@ typedef struct {
     uint8_t byCurrentScreenRotation;
 } mainConfig_S;
 
-void exitProgram(void);
+typedef enum {
+  exitProgram_param_OK = 0,
+  exitProgram_param_SendingUM34C,
+  exitProgram_param_CTRL_C,
+  exitProgram_param_C,
+  exitProgram_param_terminalColor,
+
+} exitProgram_param_E;
+
+void exitProgram(exitProgram_param_E EParam);
 
 #endif  // __main_h

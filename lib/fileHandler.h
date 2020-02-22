@@ -8,7 +8,8 @@
 #define UM34C_DATA_FILE_NAME        "um34c_data_%Y%m%d_%H%M%S.csv"  // "um34c_data_20200214_204518.csv"
 #define UM34C_DATA_FILE_NAME_LEN     31
 // #define UM34C_DATA_CSV_HEADERS "Time;Voltage;Current;\n"
-#define UM34C_DATA_CSV_HEADERS "Time;Voltage;Current;Power;Resistance;Temperature;mAh;mWh;\n"
+// #define UM34C_DATA_CSV_HEADERS "Time;Voltage;Current;Power;Resistance;Temperature;mAh;mWh;\n"
+#define UM34C_DATA_CSV_HEADERS "Time;Voltage;Current;Temperature;mAh;mWh;\n"  // Power and resistance can be calculated from Voltage and current
 
 typedef struct  {
     char szCSVfileName[UM34C_DATA_FILE_NAME_LEN];

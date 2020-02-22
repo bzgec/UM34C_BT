@@ -97,9 +97,12 @@ uint8_t byAppendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData) 
         #endif  // UM34C_NOT_IN_RANGE
 
         // CSV headers: "Time;Voltage;Current;Power;Resistance;Temperature;mAh;mWh;\n"
-        fprintf(fp, "%s;%0.2f;%01.3f;%0.3f;%0.1f;%d;%d;%d;\n", pSData->szTimeDate, 
-                pSData->fVoltage, pSData->fCurrent, pSData->fPower,
-                pSData->fResistance, pSData->byTemperatureC, 
+        // CSV headers: "Time;Voltage;Current;Temperature;mAh;mWh;\n"
+        // Power and resistance can be calculated from Voltage and current!
+        // fprintf(fp, "%s;%0.2f;%01.3f;%0.3f;%0.1f;%d;%d;%d;\n", pSData->szTimeDate, 
+        fprintf(fp, "%s;%0.2f;%01.3f;%d;%d;%d;\n", pSData->szTimeDate, 
+                pSData->fVoltage, pSData->fCurrent, /*pSData->fPower,
+                pSData->fResistance,*/ pSData->byTemperatureC, 
                 pSData->wCapacity_mAh[pSData->bySelectedGroup],
                 pSData->wCapacity_mWh[pSData->bySelectedGroup]
                 );

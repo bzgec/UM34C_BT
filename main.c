@@ -34,7 +34,7 @@ mainConfig_S g_SConfig;
 extern um34c_config_S g_SUM34C_config;
 extern fileHandler_config_S g_SFileHandler_config;
 
-void exitProgram(void) {
+void exitProgram(exitProgram_param_E EParam) {
     time_t currentTime;
     uint64_t second;
     uint8_t minute;
@@ -54,6 +54,10 @@ void exitProgram(void) {
 
     UM34C_deinit(g_SConfig.pSUM34C_config);
 
+    if(EParam == exitProgram_param_SendingUM34C) {
+        printf("Connection to UM34C is probably lost\n\r");
+    }
+    
     // print last data to terminal (if there was any data...)
     if(strcmp(g_SConfig.pSUM34C_config->SCurrentData.szTimeDate, DATE_TIME_STRING_INIT) != 0) {
         UM34C_prettyPrintData(&g_SConfig.pSUM34C_config->SCurrentData, FALSE);
@@ -75,7 +79,7 @@ void exitProgram(void) {
 
 // Catch CTRL+C
 void fs_sigintHandler(int nSigNum) {
-    exitProgram();
+    exitProgram(exitProgram_param_CTRL_C);
 }
 
 void *threadReadData_UM34C(void *arg) {
