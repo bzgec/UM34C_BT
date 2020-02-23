@@ -27,11 +27,13 @@ uint8_t bReadDevAddrFromFile(char *pszDevAddr) {
         pszDevAddr[i] = '\0';
         if(i == UM34C_ADDR_LEN-1) {
             bAddressStoredInFile = TRUE;
-        }        
-    }
+        } else {
+            logger(log_lvl_warning, "fileHandler", "Stored UM34C address in '%s' is not correct: '%s'", UM34C_ADDR_FILE_NAME, pszDevAddr);
+        }
 
-    if(fp != NULL) {
         fclose(fp);
+    } else {
+        logger(log_lvl_error, "fileHandler", "Reading device address file - failed to open '%s'", UM34C_ADDR_FILE_NAME);
     }
 
     return bAddressStoredInFile;
@@ -45,6 +47,9 @@ void storeDevAddrToFile(char *pszDevAddr) {
     if(fp != NULL) {
         fprintf(fp, "%s", pszDevAddr);
         fclose(fp);
+    } else {
+        logger(log_lvl_error, "fileHandler", "Storing UM34C address to file - failed to open '%s', device address '%s'",
+               UM34C_ADDR_FILE_NAME, pszDevAddr);
     }
 }
 
@@ -68,6 +73,8 @@ uint8_t bMakeNewCSVfile(fileHandler_config_S *pSConfig) {
         pSConfig->bFileCreated_CSV = TRUE;
         bRetVal = TRUE;
         fclose(fp);
+    } else {
+        logger(log_lvl_error, "fileHandler", "Creating new CSV file - failed to open '%s'", pSConfig->szCSVfileName);
     }
 
     return bRetVal;
@@ -112,18 +119,20 @@ uint8_t byAppendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_S *pSData) 
         if(byRetVal != 2) {
             byRetVal = 1;
         }
+
+        fclose(fp);
+    } else {
+        logger(log_lvl_error, "fileHandler", "Appending to file - failed to open '%s'", pSConfig->szCSVfileName);
     }
 
-    if(fp != NULL) {
-        fclose(fp);
-    }
 
     return byRetVal;
 }
 
-long int getFileSize(char *pszFileName) {
+float getFileSize(char *pszFileName, fileHandler_size_E EReturnIn) {
     FILE *fp;
     long int size=0;
+    float retVal = -1;
      
     // Open file in Read Mode
     fp = fopen(pszFileName,"r");
@@ -134,8 +143,37 @@ long int getFileSize(char *pszFileName) {
         
         // Get the current position of the file pointer.
         size = ftell(fp);
-    }
 
-    return size;
+        if(size == -1) {
+            retVal = -1;
+            logger(log_lvl_error, "fileHandler", "Failed to find end position of '%s'", pszFileName);
+        } else {
+            switch (EReturnIn) {
+            case fileHandler_size_B:
+                retVal = size;
+                break;
+            case fileHandler_size_kB:
+                retVal = size/BYTES_TO_kB;
+                break;
+            case fileHandler_size_MB:
+                retVal = size/BYTES_TO_MB;
+                break;
+            case fileHandler_size_GB:
+                retVal = size/BYTES_TO_GB;
+                break;
+            default:
+                retVal = -1;
+                break;
+            }
+        }
+
+        fclose(fp);
+
+    } else {
+        logger(log_lvl_error, "fileHandler", "Trying to get file size - failed to open '%s'", pszFileName);
+    }  
+
+
+    return retVal;
 }
 

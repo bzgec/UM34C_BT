@@ -66,8 +66,8 @@ void exitProgram(exitProgram_param_E EParam) {
         if(g_SConfig.pSFileHandler_config->bFileCreated_CSV == TRUE) {
             printf("Number of appends to CSV file: %d\n\r", g_SConfig.pSFileHandler_config->dwNumbOfAppends);
             logger(log_lvl_info, "main", "Number of appends to CSV file: %d", g_SConfig.pSFileHandler_config->dwNumbOfAppends);
-            printf("File size: %0.1f kB\n\r", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName)/1000.0);
-            logger(log_lvl_info, "main", "File size: %0.1f kB", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName)/1000.0);
+            printf("File size: %0.1f kB\n\r", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
+            logger(log_lvl_info, "main", "File size: %0.1f kB", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
         }
     }
 

@@ -75,12 +75,23 @@ void *threadDisplayStuff(void *arg) {
 
         // Display help at the top
         displayHelp(&wY, &wX);
-        wY += 5;  // display other information a bit lower
+
+        // Display other information a bit lower
+        if(g_SConfig.pSFileHandler_config->bFileCreated_CSV) {
+            wY += 4;  // display file size 
+        } else {
+            wY += 5;  // do not display file size if there is no file
+        }
 
         mvwprintw(stdscr, wY, wX, "Reading data: ");
         displayTrueFalse(wY++, wX+14, g_SConfig.bReadData);
         mvwprintw(stdscr, wY, wX, "Saving to CSV file: ");
         displayTrueFalse(wY++, wX+20, g_SConfig.bSaveToCSVfile);
+
+        if(g_SConfig.pSFileHandler_config->bFileCreated_CSV) {
+            mvwprintw(stdscr, wY++, wX, "File size: %0.1f kB", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
+        }
+
         mvwprintw(stdscr, wY++, wX, "Last command: ");
         mvwprintw(stdscr, wY++, wX+4, "%s", szLastCmdBuff);
 
