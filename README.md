@@ -1,8 +1,8 @@
 # Description
-This project communicates with UM34C via bluetooth. It can store UM34C's data in CSV file.  
-If bluetooth address of UM34C is not specified via command line this program checks for UM34C device and stores it's address in a `um34c_addr.txt` file for later usage (that next time you run the program there is no need to specify UM34C's address).  
-It was tested on Ubuntu 18.04.  
-![alt text](um34c.jpg "Logo Title Text 1")
+This program communicates with UM34C via bluetooth. It can store UM34C's data in CSV file.  
+It was tested on Ubuntu 18.04 and on Raspbian (Raspberry Pi Zero W and 3b+).  
+<img src="./um34c.jpg" width="300" alt="UM34C">
+<img src="./app.png" width="500" alt="Program sample">
 
 # Install
 1. Install bluetooth library:  
@@ -13,12 +13,12 @@ It was tested on Ubuntu 18.04.
 `sudo apt install make`
 4. Install gcc:  
 `sudo apt install gcc`
-5. Open root folder of this project and build application:  
+5. Open root folder of this project and build the program with:  
 `make`
 
 # Usage
 * Stop running program by pressing: `CTRL+C` or `c`  
-* Once build/compiled you can run:  
+* Once program is build/compiled type to start the program:  
 `build/main`  
 * Specify UM34C's bluetooth address (there is actually no need for this, program can search for UM34C device and than store its address in `um34c_addr.txt` for later usage (next time you run the program)):  
 `build/main -a 00:15:A3:00:2D:BF`  

@@ -45,7 +45,7 @@ void displayHelp(uint16_t *wY, uint16_t *wX) {
 void *threadDisplayStuff(void *arg) {
     initscr(); // Initialize the window
     noecho(); // Don't echo any keypresses
-    // curs_set(FALSE); // Don't display a cursor
+    curs_set(FALSE); // Don't display a cursor
     keypad(stdscr, TRUE);  // To capture special keystrokes like Backspace, Delete and the four arrow keys by getch()
     cbreak();  // no key buffering
     // nodelay(stdscr, TRUE);  // non-blocking getch()
