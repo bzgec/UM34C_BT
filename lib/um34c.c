@@ -237,7 +237,7 @@ uint8_t UM34C_bGetData(um34c_config_S *pSConfig) {
         // printf("Read %d bytes\n\r", pSConfig->nStatus);    
         // if(abyBuff[0] == '0' && abyBuff[1] == 'd' && abyBuff[2] == '4' && abyBuff[3] == 'c' && pSConfig->nStatus == UM34C_MSG_SIZE) {
         // if(abyBuff[0] == 13 && abyBuff[1] == 76 && abyBuff[2] == 1 && abyBuff[3] == 255 && pSConfig->nStatus == UM34C_MSG_SIZE) {
-        if(abyBuff[0] == 13 && abyBuff[1] == 76 && abyBuff[2] == 1 && pSConfig->nStatus == UM34C_MSG_SIZE) {
+        if(abyBuff[0] == 13 && abyBuff[1] == 76 && pSConfig->nStatus == UM34C_MSG_SIZE) {
             currentTime = time(NULL);
             tm = localtime(&currentTime);
             strftime(pSConfig->SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm);
