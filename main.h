@@ -8,8 +8,8 @@
 #define RUNNING_TIME_STRING "%H:%M:%S"
 #define RUNNING_TIME_STRING_SIZE 10
 
-#define INTREVAL_CHECK_FOR_CHAR (20*1000)  // [us]
-#define INTREVAL_UPDATE_DISPLAY (50*1000)  // [us]
+#define INTREVAL_CHECK_FOR_CHAR (50*1000)  // [us]
+#define INTREVAL_UPDATE_DISPLAY (20*1000)  // [us]
 
 // ncurses color pair index
 #define GREEN_PAIR  1
@@ -28,6 +28,8 @@ typedef struct {
     int nCmdChar_prev;
     uint8_t byDeviceBrightness;
     uint8_t byCurrentScreenRotation;
+    uint8_t bUpdateDisp;
+    char szLastCmdBuff[40];
 } mainConfig_S;
 
 typedef enum {

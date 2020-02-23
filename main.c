@@ -28,6 +28,7 @@
 
 void fs_sigintHandler(int nSigNum);
 void *threadReadData_UM34C(void *arg);
+void checkForCommand(void);
 
 
 mainConfig_S g_SConfig;
@@ -93,6 +94,7 @@ void *threadReadData_UM34C(void *arg) {
         if(g_SConfig.bReadData) {
             #ifndef UM34C_NOT_IN_RANGE
             UM34C_bGetData(g_SConfig.pSUM34C_config);
+            g_SConfig.bUpdateDisp = TRUE;
 
             #else  // #ifndef UM34C_NOT_IN_RANGE
 
@@ -116,6 +118,77 @@ void *threadReadData_UM34C(void *arg) {
     }
 }
 
+void checkForCommand(void) {
+
+    if(g_SConfig.nCmdChar == ERR) {
+        // no input from terminal
+    } else {
+        switch (g_SConfig.nCmdChar) {
+        case KEY_UP:  // Brightness UP
+            g_SConfig.byDeviceBrightness = g_SConfig.pSUM34C_config->SCurrentData.byBrightness;
+            if(g_SConfig.byDeviceBrightness < um34c_cmd_setBrightness5-um34c_cmd_setBrightness0) {
+                g_SConfig.byDeviceBrightness++;
+            }
+            UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, (um34c_cmd_E)(g_SConfig.byDeviceBrightness + um34c_cmd_setBrightness0), &g_SConfig.pSUM34C_config->nStatus);
+            sprintf(g_SConfig.szLastCmdBuff, "Brightness: %d (UP)", g_SConfig.byDeviceBrightness);
+            break;
+        case KEY_DOWN:  // Brightness DOWN
+            g_SConfig.byDeviceBrightness = g_SConfig.pSUM34C_config->SCurrentData.byBrightness;
+            if(g_SConfig.byDeviceBrightness > um34c_cmd_setBrightness0-um34c_cmd_setBrightness0) {
+                g_SConfig.byDeviceBrightness--;
+            }
+            UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, (um34c_cmd_E)(g_SConfig.byDeviceBrightness + um34c_cmd_setBrightness0), &g_SConfig.pSUM34C_config->nStatus);
+            sprintf(g_SConfig.szLastCmdBuff, "Brightness: %d (DOWN)", g_SConfig.byDeviceBrightness);
+            break;
+        case KEY_LEFT:  // Previous display
+            UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, um34c_cmd_prev, &g_SConfig.pSUM34C_config->nStatus);
+            sprintf(g_SConfig.szLastCmdBuff, "Previous display");
+           break;
+        case KEY_RIGHT:  // Next display
+            UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, um34c_cmd_next, &g_SConfig.pSUM34C_config->nStatus);
+            sprintf(g_SConfig.szLastCmdBuff, "Next display");
+            break;
+        case 'c':  // Exit program
+            exitProgram(exitProgram_param_C);
+            break;
+        case 0x20:  // Toggle data sampling - 'space'
+            g_SConfig.bReadData = !g_SConfig.bReadData;
+            sprintf(g_SConfig.szLastCmdBuff, "Toggle data sampling.");
+            break;
+        case 's':  // Toggle saving to CSV file
+            g_SConfig.bSaveToCSVfile = !g_SConfig.bSaveToCSVfile;
+            sprintf(g_SConfig.szLastCmdBuff, "Toggle saving to CSV file.");
+            break;
+        case 'r':  // rotate screen
+            UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, um34c_cmd_rotateClockwise, &g_SConfig.pSUM34C_config->nStatus);
+            g_SConfig.byCurrentScreenRotation++;
+            if(g_SConfig.byCurrentScreenRotation % 4 == 0) {
+                g_SConfig.byCurrentScreenRotation = 0;
+            }
+            sprintf(g_SConfig.szLastCmdBuff, "Rotating screen: %d", g_SConfig.byCurrentScreenRotation);
+            break;
+        case '0':  // set screen timeout
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, (g_SConfig.nCmdChar - '0') + um34c_cmd_setTimeout0, &g_SConfig.pSUM34C_config->nStatus);
+            sprintf(g_SConfig.szLastCmdBuff, "Screen timeout: %d", g_SConfig.nCmdChar - '0');
+            break;
+        default:
+            break;
+        }
+    }
+    g_SConfig.nCmdChar = ERR;  // so that we can press 'UP' two times...
+    g_SConfig.nCmdChar_prev = g_SConfig.nCmdChar;
+    logger(log_lvl_debug, "display", "Last command: %s", g_SConfig.szLastCmdBuff);
+}
+
 int main(int argc, char **argv) {
     pthread_t threadUM34C;
     pthread_t threadDisplay;
@@ -136,6 +209,8 @@ int main(int argc, char **argv) {
     g_SConfig.byDeviceBrightness = 3;
     g_SConfig.byCurrentScreenRotation = 0;
     g_SConfig.pSFileHandler_config->bFileCreated_CSV = FALSE;
+    g_SConfig.bUpdateDisp = TRUE;
+    strcpy(g_SConfig.szLastCmdBuff, "No command yet");
 
     // Check passed arguments
     if(argc > 1) {
@@ -280,6 +355,11 @@ int main(int argc, char **argv) {
     while(1) {       
 
         g_SConfig.nCmdChar = getch();
+        if(g_SConfig.nCmdChar != g_SConfig.nCmdChar_prev) {
+           checkForCommand();
+           g_SConfig.bUpdateDisp = TRUE;
+        }
+        
 
         usleep(INTREVAL_CHECK_FOR_CHAR);  // sleep time should be the as long as timer interval
     }

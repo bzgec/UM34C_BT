@@ -65,109 +65,42 @@ void *threadDisplayStuff(void *arg) {
 
     uint16_t wX;
     uint16_t wY;
-    char szLastCmdBuff[40] = "No command yet";
     
     while(1) {
-        wX = 0;
-        wY = 0;
+        // Update display only if there are changes
+        if(g_SConfig.bUpdateDisp) {
+            g_SConfig.bUpdateDisp = FALSE;
+            wX = 0;
+            wY = 0;
 
-        wclear(stdscr); // Clear the screen of all
+            wclear(stdscr); // Clear the screen of all
 
-        // Display help at the top
-        displayHelp(&wY, &wX);
+            // Display help at the top
+            displayHelp(&wY, &wX);
 
-        // Display other information a bit lower
-        if(g_SConfig.pSFileHandler_config->bFileCreated_CSV) {
-            wY += 4;  // display file size 
-        } else {
-            wY += 5;  // do not display file size if there is no file
-        }
-
-        mvwprintw(stdscr, wY, wX, "Reading data: ");
-        displayTrueFalse(wY++, wX+14, g_SConfig.bReadData);
-        mvwprintw(stdscr, wY, wX, "Saving to CSV file: ");
-        displayTrueFalse(wY++, wX+20, g_SConfig.bSaveToCSVfile);
-
-        if(g_SConfig.pSFileHandler_config->bFileCreated_CSV) {
-            mvwprintw(stdscr, wY++, wX, "File size: %0.1f kB", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
-        }
-
-        mvwprintw(stdscr, wY++, wX, "Last command: ");
-        mvwprintw(stdscr, wY++, wX+4, "%s", szLastCmdBuff);
-
-        UM34C_prettyPrintData(&g_SConfig.pSUM34C_config->SCurrentData, TRUE);
-
-        if(g_SConfig.nCmdChar != g_SConfig.nCmdChar_prev) {
-            if(g_SConfig.nCmdChar == ERR) {
-                // no input from terminal
+            // Display other information a bit lower
+            if(g_SConfig.pSFileHandler_config->bFileCreated_CSV) {
+                wY += 4;  // display file size 
             } else {
-                switch (g_SConfig.nCmdChar) {
-                case KEY_UP:  // Brightness UP
-                    g_SConfig.byDeviceBrightness = g_SConfig.pSUM34C_config->SCurrentData.byBrightness;
-                    if(g_SConfig.byDeviceBrightness < um34c_cmd_setBrightness5-um34c_cmd_setBrightness0) {
-                        g_SConfig.byDeviceBrightness++;
-                    }
-                    UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, (um34c_cmd_E)(g_SConfig.byDeviceBrightness + um34c_cmd_setBrightness0), &g_SConfig.pSUM34C_config->nStatus);
-                    sprintf(szLastCmdBuff, "Brightness: %d (UP)", g_SConfig.byDeviceBrightness);
-                    break;
-                case KEY_DOWN:  // Brightness DOWN
-                    g_SConfig.byDeviceBrightness = g_SConfig.pSUM34C_config->SCurrentData.byBrightness;
-                    if(g_SConfig.byDeviceBrightness > um34c_cmd_setBrightness0-um34c_cmd_setBrightness0) {
-                        g_SConfig.byDeviceBrightness--;
-                    }
-                    UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, (um34c_cmd_E)(g_SConfig.byDeviceBrightness + um34c_cmd_setBrightness0), &g_SConfig.pSUM34C_config->nStatus);
-                    sprintf(szLastCmdBuff, "Brightness: %d (DOWN)", g_SConfig.byDeviceBrightness);
-                    break;
-                case KEY_LEFT:  // Previous display
-                    UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, um34c_cmd_prev, &g_SConfig.pSUM34C_config->nStatus);
-                    sprintf(szLastCmdBuff, "Previous display");
-                   break;
-                case KEY_RIGHT:  // Next display
-                    UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, um34c_cmd_next, &g_SConfig.pSUM34C_config->nStatus);
-                    sprintf(szLastCmdBuff, "Next display");
-                    break;
-                case 'c':  // Exit program
-                    exitProgram(exitProgram_param_C);
-                    break;
-                case 0x20:  // Toggle data sampling - 'space'
-                    g_SConfig.bReadData = !g_SConfig.bReadData;
-                    sprintf(szLastCmdBuff, "Toggle data sampling.");
-                    break;
-                case 's':  // Toggle saving to CSV file
-                    g_SConfig.bSaveToCSVfile = !g_SConfig.bSaveToCSVfile;
-                    sprintf(szLastCmdBuff, "Toggle saving to CSV file.");
-                    break;
-                case 'r':  // rotate screen
-                    UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, um34c_cmd_rotateClockwise, &g_SConfig.pSUM34C_config->nStatus);
-                    g_SConfig.byCurrentScreenRotation++;
-                    if(g_SConfig.byCurrentScreenRotation % 4 == 0) {
-                        g_SConfig.byCurrentScreenRotation = 0;
-                    }
-                    sprintf(szLastCmdBuff, "Rotating screen: %d", g_SConfig.byCurrentScreenRotation);
-                    break;
-                case '0':  // set screen timeout
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9':
-                    UM34C_sendCmd(g_SConfig.pSUM34C_config->nSocketHandle, (g_SConfig.nCmdChar - '0') + um34c_cmd_setTimeout0, &g_SConfig.pSUM34C_config->nStatus);
-                    sprintf(szLastCmdBuff, "Screen timeout: %d", g_SConfig.nCmdChar - '0');
-                    break;
-                default:
-                    break;
-                }
+                wY += 5;  // do not display file size if there is no file
             }
-            g_SConfig.nCmdChar = ERR;  // so that we can press 'UP' two times...
-            g_SConfig.nCmdChar_prev = g_SConfig.nCmdChar;
-            logger(log_lvl_debug, "display", "Last command: %s", szLastCmdBuff);
-        }
 
-        wrefresh(stdscr);
+            mvwprintw(stdscr, wY, wX, "Reading data: ");
+            displayTrueFalse(wY++, wX+14, g_SConfig.bReadData);
+            mvwprintw(stdscr, wY, wX, "Saving to CSV file: ");
+            displayTrueFalse(wY++, wX+20, g_SConfig.bSaveToCSVfile);
+
+            if(g_SConfig.pSFileHandler_config->bFileCreated_CSV) {
+                mvwprintw(stdscr, wY++, wX, "File size: %0.1f kB", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
+            }
+
+            mvwprintw(stdscr, wY++, wX, "Last command: ");
+            mvwprintw(stdscr, wY++, wX+4, "%s", g_SConfig.szLastCmdBuff);
+
+            UM34C_prettyPrintData(&g_SConfig.pSUM34C_config->SCurrentData, TRUE);
+
+            wrefresh(stdscr);
+        }
 
         usleep(INTREVAL_UPDATE_DISPLAY);  // sleep time should be the as long as timer interval
     }
