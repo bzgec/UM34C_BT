@@ -22,8 +22,8 @@ It was tested on Ubuntu 18.04 and on Raspbian (Raspberry Pi Zero W and 3b+).
 `build/main`  
 * Specify UM34C's bluetooth address (there is actually no need for this, program can search for UM34C device and than store its address in `um34c_addr.txt` for later usage (next time you run the program)):  
 `build/main -a 00:15:A3:00:2D:BF`  
-* Specify interval in which data from UM34C is queried (in us) - default value is 500000us (500ms). This example sets it to 1000000us which is 1s:  
-`build/main -i 1000000`  
+* Specify interval in which data from UM34C is queried (in ms) - default value is 500ms and minimal is 400ms. This example sets it to 1000ms which is 1s:  
+`build/main -i 1000`  
 * Start reading device on startup:  
 `build/main -r`  
 * Start reading device and saving data to CSV file on startup:  

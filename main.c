@@ -26,6 +26,7 @@
 #include "logger.h"
 #include "display.h"
 
+
 void fs_sigintHandler(int nSigNum);
 void *threadReadData_UM34C(void *arg);
 void checkForCommand(void);
@@ -67,8 +68,8 @@ void exitProgram(exitProgram_param_E EParam) {
         if(g_SConfig.pSFileHandler_config->bFileCreated_CSV == TRUE) {
             printf("Number of appends to CSV file: %d\n\r", g_SConfig.pSFileHandler_config->dwNumbOfAppends);
             logger(log_lvl_info, "main", "Number of appends to CSV file: %d", g_SConfig.pSFileHandler_config->dwNumbOfAppends);
-            printf("File size: %0.1f kB\n\r", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
-            logger(log_lvl_info, "main", "File size: %0.1f kB", getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName, fileHandler_size_kB));
+            printf("File size: %0.1f kB\n\r", BYTES_TO_kB(getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName)));
+            logger(log_lvl_info, "main", "File size: %0.1f kB", BYTES_TO_kB(getFileSize(g_SConfig.pSFileHandler_config->szCSVfileName)));
         }
     }
 
@@ -86,15 +87,16 @@ void fs_sigintHandler(int nSigNum) {
 void *threadReadData_UM34C(void *arg) {
     time_t currentTime;
     struct tm *tm;
-    uint8_t byAppendRetVal;
+    fileHandler_info_E EAppendRetVal;
 
     g_SConfig.pSFileHandler_config->dwNumbOfAppends = 0;
 
     while(1) {
         if(g_SConfig.bReadData) {
+            g_SConfig.bUpdateDisp = TRUE;
+
             #ifndef UM34C_NOT_IN_RANGE
             UM34C_bGetData(g_SConfig.pSUM34C_config);
-            g_SConfig.bUpdateDisp = TRUE;
 
             #else  // #ifndef UM34C_NOT_IN_RANGE
 
@@ -105,10 +107,10 @@ void *threadReadData_UM34C(void *arg) {
             #endif  // UM34C_NOT_IN_RANGE
 
             if(g_SConfig.bSaveToCSVfile) {
-                byAppendRetVal = byAppendToCSVfile(g_SConfig.pSFileHandler_config, &g_SConfig.pSUM34C_config->SCurrentData);
-                if(byAppendRetVal == 2) {
+                EAppendRetVal = byAppendToCSVfile(g_SConfig.pSFileHandler_config, &g_SConfig.pSUM34C_config->SCurrentData);
+                if(fileHandler_info_FILE_CREATED == 2) {
                     logger(log_lvl_debug, "main", "CSV file created %s", g_SConfig.pSFileHandler_config->szCSVfileName);
-                } else if (byAppendRetVal == 0) {
+                } else if (EAppendRetVal != fileHandler_info_OK) {
                     logger(log_lvl_error, "main", "Error on appending to CSV file");
                 }
             }
@@ -227,7 +229,7 @@ int main(int argc, char **argv) {
             } else if (strcmp(argv[i], "-i") == 0) {
                 // Timer interval
                 if(++i < argc) {
-                    g_SConfig.pSUM34C_config->dwTimerInterval = strtoul(argv[i], NULL, 10);
+                    g_SConfig.pSUM34C_config->dwTimerInterval = ms_TO_us(strtoul(argv[i], NULL, 10));
                     if(g_SConfig.pSUM34C_config->dwTimerInterval == 0) { 
                         printf("Error parsing interval value\n\r");
                         logger(log_lvl_error, "main", "Error parsing interval value");
@@ -251,6 +253,10 @@ int main(int argc, char **argv) {
                 g_SConfig.bSaveToCSVfile = TRUE;
             } else if(strcmp(argv[i], "-r") == 0) {
                 g_SConfig.bReadData = TRUE;
+            } else if (strcmp(argv[i], "-h") == 0 || 
+                       strcmp(argv[i], "--help") == 0) {
+                displayHelp(0, 0, FALSE);
+                return 0;
             }
         }
     }

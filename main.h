@@ -11,6 +11,8 @@
 #define INTREVAL_CHECK_FOR_CHAR (50*1000)  // [us]
 #define INTREVAL_UPDATE_DISPLAY (20*1000)  // [us]
 
+#define ms_TO_us(ms)  ((ms)*1000)
+
 // ncurses color pair index
 #define GREEN_PAIR  1
 #define RED_PAIR    2
