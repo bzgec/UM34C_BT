@@ -367,6 +367,7 @@ int main(int argc, char **argv) {
     g_SConfig.wMovAvgStrength = 0;
     g_SConfig.byRecCurrThreshold_cA = 0;
     g_SConfig.bShowHelp = FALSE;
+    g_SConfig.bUseGUI = TRUE;
     strcpy(g_SConfig.szLastCmdBuff, "No command yet");
 
     // Check passed arguments
@@ -455,6 +456,9 @@ int main(int argc, char **argv) {
                 }
             // } else if (strcmp(argv[i], "-g") == 0) {
                 // Set data groups (reset it also?)
+            } else if(strcmp(argv[i], "-n") == 0) {
+                // No GUI
+                g_SConfig.bUseGUI = FALSE;
             }
         }
     }
@@ -573,20 +577,24 @@ int main(int argc, char **argv) {
     //     }
     // }
 
-    // Create display thread
-    pthread_create(&threadDisplay, NULL, threadDisplayStuff, NULL);
+    if(g_SConfig.bUseGUI == TRUE) {
+        // Create display thread (only if GUI is used)
+        pthread_create(&threadDisplay, NULL, threadDisplayStuff, NULL);
+    }
 
     // Create thread to request data from UM34C
     pthread_create(&threadUM34C, NULL, threadReadData_UM34C, NULL);
 
     while(1) {       
 
-        g_SConfig.nCmdChar = getch();
-        if(g_SConfig.nCmdChar != ERR) {
-           checkForCommand();
-           g_SConfig.bUpdateDisp = TRUE;
+        if(g_SConfig.bUseGUI == TRUE) {
+            // Check for user inputs (only if GUI is used)
+            g_SConfig.nCmdChar = getch();
+            if(g_SConfig.nCmdChar != ERR) {
+               checkForCommand();
+               g_SConfig.bUpdateDisp = TRUE;
+            }
         }
-        
 
         usleep(INTREVAL_CHECK_FOR_CHAR);  // sleep time should be the as long as timer interval
     }

@@ -39,6 +39,7 @@ typedef struct {
     movingAvg_handle_f_S SMvgAvg_handle_fCurrent;
     uint16_t wMovAvgStrength;
     uint8_t bShowHelp;
+    uint8_t bUseGUI;
 } mainConfig_S;
 
 typedef enum {

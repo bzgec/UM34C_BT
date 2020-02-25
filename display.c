@@ -75,7 +75,12 @@ void displayHelp(uint16_t *wY, uint16_t *wX, uint8_t bUseNcurses) {
                "becasue we set query interval to 500ms every 10 seconds value is\n\r\t  " \
                "appended to CSV file):\n\r\t\t`build/um34c -f 20 -q 500` \n\r");
         printf("\t- Set record current threshold in cA (at which current measuring\n\r\t  " \
-               "mAh and mWh starts). Here we set it to 5cA which is 0.05A:\n\r\t\t`build/um34c -i 5`");
+               "mAh and mWh starts). Here we set it to 5cA which is 0.05A:\n\r\t\t`build/um34c -i 5`\n\r");
+        printf("\t- If GUI is not used (for example program runned in background)\n\r\t  " \
+               "use `-n` flag, example of programm running in background:\n\r\t\t`build/um34c -f 4 -q 500 -r -csv -i 5 -n > /dev/null &`\n\r" \
+               "\t   - To kill program like that run `ps aux | grep um34c`\n\r\t     " \
+               "and than `kill yourPID` where 'yourPID' is PID you got\n\r\t     " \
+               "from command before.");
         printf("\n\rIn application:\n\r");
         printf("\t- Press `h` to display/close help");
         printf("\t- Exit application: `CTRL+C` or `c`\n\r");

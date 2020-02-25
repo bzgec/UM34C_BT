@@ -32,6 +32,10 @@ It was tested on Ubuntu 18.04 and on Raspbian (Raspberry Pi Zero W and 3b+).
 `build/um34c -f 20 -q 500`
 * Set record current threshold in cA (at which current measuring mAh and mWh starts). Here we set it to 5cA which is 0.05A:
 `build/um34c -i 5`
+* If GUI is not used (for example program runned in background) use `-n` flag, example of programm running in background:  
+`build/um34c -f 4 -q 500 -r -csv -i 5 -n > /dev/null &`   
+    * To kill program like that run `ps aux | grep um34c` and than `kill yourPID` where 'yourPID' is PID you got from command before.
+
 
 ## In application
 * Press `h` to display/close help
@@ -56,6 +60,7 @@ It was tested on Ubuntu 18.04 and on Raspbian (Raspberry Pi Zero W and 3b+).
 
 # Thanks
 Thanks to 'sebastianha' who inspired this project. Here is [LINK](https://github.com/sebastianha/um34c) to his project.
+There is also a lot of info on 'sigrok' website [LINK](https://sigrok.org/wiki/RDTech_UM_series).
 
 # Suggestions
 If you have any suggestions please let me know.
