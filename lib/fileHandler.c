@@ -117,8 +117,8 @@ fileHandler_info_E byAppendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_
             fprintf(fp, "%s;%0.2f;%01.3f;%d;%d;%d;\n", pSData->szTimeDate, 
                     pSData->fVoltage, pSData->fCurrent, /*pSData->fPower,
                     pSData->fResistance,*/ pSData->byTemperatureC, 
-                    pSData->wCapacity_mAh[pSData->bySelectedGroup],
-                    pSData->wCapacity_mWh[pSData->bySelectedGroup]
+                    pSData->wThreshold_mAh,
+                    pSData->wThreshold_mWh
                     );
             pSConfig->dwNumbOfAppends++;
 

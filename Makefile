@@ -15,7 +15,7 @@ ODIR := build
 # Folder in which libraries are stored
 LDIR := lib
 
-.DEFAULT_GOAL := $(ODIR)/main
+.DEFAULT_GOAL := $(ODIR)/um34c
 
 # Compiler to use
 CC=gcc
@@ -42,7 +42,7 @@ $(ODIR)/%.o: %.c $(DEPS) | $(ODIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 # Create executable
-$(ODIR)/main: $(OBJ)
+$(ODIR)/um34c: $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 

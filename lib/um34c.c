@@ -23,6 +23,7 @@
 #include "config.h"
 #include "logger.h"
 #include "main.h"
+#include "display.h"
 
 static int16_t fs_sConvertStringToHex(char *cmd);
 static uint8_t fs_byGetNum(char ch);
@@ -221,11 +222,29 @@ void timer_handler (int signum) {
     }
 }
 
+uint8_t UM34C_bMatchID(uint16_t wModeID) {
+    uint8_t bModelMatched;
+    switch (wModeID)
+    {
+    case 0x0963:  // UM24C
+    case 0x09c9:  // UM25C
+    case 0x0d4c:  // UM34C
+        bModelMatched = TRUE;
+        break;
+    default:
+        bModelMatched = FALSE;
+        break;
+    }
+
+    return bModelMatched;
+}
+
 uint8_t UM34C_bGetData(um34c_config_S *pSConfig) {
     uint8_t abyBuff[UM34C_MSG_SIZE] = {0};
     time_t currentTime;
     struct tm *tm;
     uint8_t bRetVal = FALSE;
+    uint16_t wDeviceID;
 
     // Send query
     UM34C_sendCmd(pSConfig->nSocketHandle, um34c_cmd_getData, &pSConfig->nStatus);
@@ -233,21 +252,24 @@ uint8_t UM34C_bGetData(um34c_config_S *pSConfig) {
         // Data sent successfully, now read data from device
         // printf("Reading device...\n\r");
         UM34C_readCmd(pSConfig->nSocketHandle, abyBuff, UM34C_MSG_SIZE, &pSConfig->nStatus);
-        // Check if data was received correctly (first 4 chars should be '0d4c' and 'UM34C_MSG_SIZE' bytes should be received)
-        // printf("Read %d bytes\n\r", pSConfig->nStatus);    
-        // if(abyBuff[0] == '0' && abyBuff[1] == 'd' && abyBuff[2] == '4' && abyBuff[3] == 'c' && pSConfig->nStatus == UM34C_MSG_SIZE) {
-        // if(abyBuff[0] == 13 && abyBuff[1] == 76 && abyBuff[2] == 1 && abyBuff[3] == 255 && pSConfig->nStatus == UM34C_MSG_SIZE) {
-        if(abyBuff[0] == 13 && abyBuff[1] == 76 && pSConfig->nStatus == UM34C_MSG_SIZE) {
-            currentTime = time(NULL);
-            tm = localtime(&currentTime);
-            strftime(pSConfig->SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm);
-            // printf("date: %s\n\r", pSConfig->SCurrentData.szTimeDate);
-            UM34C_decodeData(abyBuff, &pSConfig->SCurrentData);
-            pSConfig->byErrSend = 0;
-            bRetVal = TRUE;
+        
+        // Check if data was received correctly: 'UM34C_MSG_SIZE' bytes should be received and device model ID should match)
+        if(pSConfig->nStatus == UM34C_MSG_SIZE) {
+            wDeviceID = (abyBuff[0] << 8) + abyBuff[1];
+            if(UM34C_bMatchID(wDeviceID)) {
+                currentTime = time(NULL);
+                tm = localtime(&currentTime);
+                strftime(pSConfig->SCurrentData.szTimeDate, DATE_TIME_STRING_SIZE, DATE_TIME_STRING_FORMAT, tm);
+                // printf("date: %s\n\r", pSConfig->SCurrentData.szTimeDate);
+                UM34C_decodeData(abyBuff, &pSConfig->SCurrentData);
+                pSConfig->byErrSend = 0;
+                bRetVal = TRUE;
+            } else {
+                logger(log_lvl_error, "um34c", "Error on receiving data from UM34C - model ID mismatch (0x%04X)", wDeviceID);
+            }
         } else {
             // printf("Error on receiving data from UM34C (received %d bytes)\n\r", pSConfig->nStatus);
-            logger(log_lvl_error, "um34c", "Error on receiving data from UM34C (received %d bytes)", pSConfig->nStatus);
+            logger(log_lvl_error, "um34c", "Error on receiving data from UM34C (received %d bytes), but it should be %u bytes", pSConfig->nStatus, UM34C_MSG_SIZE);
         }
     } else {
         // printf("Error on sending data to UM34C");
@@ -279,12 +301,35 @@ void UM34C_readCmd(int nSocketHandle, uint8_t *pabyBuff, size_t size, int *pnSta
     *pnStatus = read(nSocketHandle, pabyBuff, size);
 }
 
-void UM34C_prettyPrintData(um34c_data_S *pSData, uint8_t bUseNcurses) {
-    uint16_t wX = 0;
-    uint16_t wY = 0;
-    uint16_t wXOffset = 50;
-    uint16_t wYOffset = 0;
-    char *pszModes [] = {
+const char *UM34C_getModelName(UM_C_devices_E EDevice) {
+    static const char *s_pszDeviceModels[] = {
+        "Unknown", // 0
+        "UM24C",   // 1
+        "UM25C",   // 2
+        "UM34C"    // 3
+    };
+
+    switch (EDevice)
+    {
+    case UM24C:
+        return s_pszDeviceModels[1];
+        break;
+    case UM25C:
+        return s_pszDeviceModels[2];
+        break;
+    case UM34C:
+        return s_pszDeviceModels[3];
+        break;
+    default:
+        return s_pszDeviceModels[0];
+        break;
+    }
+
+    return s_pszDeviceModels[0];
+}
+
+const char *UM34C_getChargingMode(uint8_t byChargingModeNumb) {
+    static const char *s_pszModes [] = {
 		"Unknown",  // 0
 		"QC2.0",    // 1
 		"QC3.0",    // 2
@@ -295,42 +340,75 @@ void UM34C_prettyPrintData(um34c_data_S *pSData, uint8_t bUseNcurses) {
 		"DCP1.5A",  // 7
 		"SAMSUNG"   // 8
     };
+
+    return s_pszModes[byChargingModeNumb];
+}
+
+void UM34C_prettyPrintData(uint16_t *wY, uint16_t *wX, um34c_data_S *pSData, uint8_t bUseNcurses) {
     
     if(bUseNcurses) {
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Last data:");
-        wX += 4;
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Time: %s", pSData->szTimeDate);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Voltage: %0.2f V", pSData->fVoltage);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Current: %01.3f A", pSData->fCurrent);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Power: %0.3f W", pSData->fPower);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Resistance: %0.1f Ohm", pSData->fResistance);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Temperature: %d*C", pSData->byTemperatureC);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Selected group: %d", pSData->bySelectedGroup);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Capacity [mAh]: %d", pSData->wCapacity_mAh[pSData->bySelectedGroup]);
-	    mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Capacity [mWh]: %d", pSData->wCapacity_mWh[pSData->bySelectedGroup]);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Current screen: %d", pSData->byCurrentScreen);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Brightness: %d", pSData->byBrightness);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Screen timeout: %d", pSData->byScreenTimeout);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "USB + data line: %0.2f", pSData->fUsbDataPlus);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "USB - data line: %0.2f", pSData->fUsbDataMinus);
-        mvwprintw(stdscr, wYOffset + wY++, wXOffset + wX, "Charging mode: %s", pszModes[pSData->byChargingMode]);
+        mvwprintw(stdscr, (*wY)++, *wX, "Data:");
+        *wX += 4;
+        mvwprintw(stdscr, (*wY)++, *wX, "Time: %s", pSData->szTimeDate);
+        mvwprintw(stdscr, (*wY)++, *wX, "Voltage: %0.2f V", pSData->fVoltage);
+        mvwprintw(stdscr, (*wY)++, *wX, "Current: %01.3f A", pSData->fCurrent);
+        mvwprintw(stdscr, (*wY)++, *wX, "Power: %0.3f W", pSData->fPower);
+        mvwprintw(stdscr, (*wY)++, *wX, "Resistance: %0.1f Ohm", pSData->fResistance);
+        mvwprintw(stdscr, (*wY)++, *wX, "Temperature: %d*C", pSData->byTemperatureC);
+        mvwprintw(stdscr, (*wY), *wX, "Recording active: ");
+        displayTrueFalse((*wY)++, *wX+18, pSData->bThreshold_active);
+        mvwprintw(stdscr, (*wY)++, *wX, "Recording mAh: %u", pSData->wThreshold_mAh);
+        mvwprintw(stdscr, (*wY)++, *wX, "Recording mWh: %u", pSData->wThreshold_mWh);
+        mvwprintw(stdscr, (*wY)++, *wX, "USB + data line: %0.2f", pSData->fUsbDataPlus);
+        mvwprintw(stdscr, (*wY)++, *wX, "USB - data line: %0.2f", pSData->fUsbDataMinus);
     } else {
-        printf("Last data:\n\r");
+        printf("Data:\n\r");
         printf("\tTime: %s\n\r", pSData->szTimeDate);
         printf("\tVoltage: %0.2f V\n\r", pSData->fVoltage);
         printf("\tCurrent: %01.3f A\n\r", pSData->fCurrent);
         printf("\tPower: %0.3f W\n\r", pSData->fPower);
         printf("\tResistance: %0.1f Ohm\n\r", pSData->fResistance);
         printf("\tTemperature: %d*C\n\r", pSData->byTemperatureC);
+        printf("\tRecording active: %01u\n\r", pSData->bThreshold_active);
+        printf("\tRecording mAh: %u\n\r", pSData->wThreshold_mAh);
+        printf("\tRecording mWh: %u\n\r", pSData->wThreshold_mWh);
+        printf("\tUSB + data line: %0.2f\n\r", pSData->fUsbDataPlus);
+        printf("\tUSB - data line: %0.2f\n\r", pSData->fUsbDataMinus);
+    }
+    
+    // for(uint8_t g=0; g<10; g++) {
+	// 	printf("  %d  mAh: %d", g, pSData->mAh[g]);
+	// 	printf("  mWh: %d\n\r", pSData->mWh[g]);
+	// }
+}
+
+void UM34C_prettyPrintSettings(uint16_t *wY, uint16_t *wX, um34c_data_S *pSData, uint8_t bUseNcurses) {
+    
+    if(bUseNcurses) {
+        mvwprintw(stdscr, (*wY)++, *wX, "Settings:");
+        *wX += 4;
+        mvwprintw(stdscr, (*wY)++, *wX, "Model: %s", pSData->pszModelID);
+        mvwprintw(stdscr, (*wY)++, *wX, "Current threshold [A]: %0.2f", pSData->byThreshold_cA/100.0);
+        mvwprintw(stdscr, (*wY)++, *wX, "Selected group: %d", pSData->bySelectedGroup);
+        mvwprintw(stdscr, (*wY)++, *wX, "Capacity [mAh]: %d", pSData->wCapacity_mAh[pSData->bySelectedGroup]);
+	    mvwprintw(stdscr, (*wY)++, *wX, "Capacity [mWh]: %d", pSData->wCapacity_mWh[pSData->bySelectedGroup]);
+        mvwprintw(stdscr, (*wY)++, *wX, "Current screen: %d", pSData->byCurrentScreen);
+        mvwprintw(stdscr, (*wY)++, *wX, "Brightness: %d", pSData->byBrightness);
+        mvwprintw(stdscr, (*wY)++, *wX, "Screen timeout: %d", pSData->byScreenTimeout);
+        mvwprintw(stdscr, (*wY)++, *wX, "Charging mode: %s", pSData->pszChargingMode);
+        mvwprintw(stdscr, (*wY)++, *wX, "Recording duration: %u", pSData->wThreshold_duration);
+    } else {
+        printf("Settings:\n\r");
+        printf("\tModel: %s\n\r", pSData->pszModelID);
+        printf("\tCurrent threshold [A]: %0.2f\n\r", pSData->byThreshold_cA/100.0);
         printf("\tSelected group: %d\n\r", pSData->bySelectedGroup);
         printf("\tCapacity [mAh]: %d\n\r", pSData->wCapacity_mAh[pSData->bySelectedGroup]);
 	    printf("\tCapacity [mWh]: %d\n\r", pSData->wCapacity_mWh[pSData->bySelectedGroup]);
         printf("\tCurrent screen: %d\n\r", pSData->byCurrentScreen);
         printf("\tBrightness: %d\n\r", pSData->byBrightness);
         printf("\tScreen timeout: %d\n\r", pSData->byScreenTimeout);
-        printf("\tUSB + data line: %0.2f\n\r", pSData->fUsbDataPlus);
-        printf("\tUSB - data line: %0.2f\n\r", pSData->fUsbDataMinus);
-        printf("\tCharging mode: %s\n\r", pszModes[pSData->byChargingMode]);
+        printf("\tCharging mode: %s\n\r", pSData->pszChargingMode);
+        printf("\tRecording duration: %u\n\r", pSData->wThreshold_duration);
     }
     
     // for(uint8_t g=0; g<10; g++) {
@@ -359,7 +437,8 @@ void UM34C_decodeData(uint8_t *buf, um34c_data_S *pSData) {
 	 * 0002 0001 0007 0000 0007 0000 0025 0013 0000 0046 0000 0001 0004 0000 0160 0000 8068
 	 * d+__ d-__ mode recA_____ recW_____ recT recTime__ con? tout brig ohm______ scre
 	 */
-    // Voltage in "V"
+
+    pSData->pszModelID = UM34C_getModelName((buf[0] << 8) + buf[1]);
 	pSData->fVoltage = ((buf[2] << 8) + buf[3]) / 100.0;
 	pSData->fCurrent = ((buf[4] << 8) + buf[5]) / 1000.0;
 	pSData->fPower = ((buf[6] << 8*3) + (buf[7] << 8*2) + (buf[8] << 8*1) + (buf[9] << 8*0)) / 1000.0;
@@ -367,7 +446,12 @@ void UM34C_decodeData(uint8_t *buf, um34c_data_S *pSData) {
     pSData->bySelectedGroup = (buf[14] << 8) + buf[15];
     pSData->fUsbDataPlus = ((buf[96] << 8) + buf[97]) / 100.0;
     pSData->fUsbDataMinus = ((buf[98] << 8) + buf[99]) / 100.0;
-    pSData->byChargingMode = (buf[100] << 8) + buf[101];
+    pSData->pszChargingMode = UM34C_getChargingMode((buf[100] << 8) + buf[101]);
+    pSData->wThreshold_mAh = (buf[102] << 8*3) + (buf[103] << 8*2) + (buf[104] << 8*1) + (buf[105] << 8*0);
+    pSData->wThreshold_mWh = (buf[106] << 8*3) + (buf[107] << 8*2) + (buf[108] << 8*1) + (buf[109] << 8*0);
+    pSData->byThreshold_cA = (buf[110] << 8) + buf[111];
+    pSData->wThreshold_duration = (buf[112] << 8*3) + (buf[113] << 8*2) + (buf[114] << 8*1) + (buf[115] << 8*0);
+    pSData->bThreshold_active = (buf[116] << 8) + buf[117];
     pSData->byScreenTimeout = (buf[118] << 8) + buf[119];
     pSData->byBrightness = (buf[120] << 8) + buf[121];
 	pSData->fResistance = ((buf[122] << 8*3) + (buf[123] << 8*2) + (buf[124] << 8*1) + (buf[125] << 8*0)) / 10.0;
@@ -400,7 +484,7 @@ uint8_t fs_byGetNum(char ch) {
             returnVal = 12;
             break;
         case 'D':
-        case 'd':
+        case 'g':
             returnVal = 13;
             break;
         case 'E':

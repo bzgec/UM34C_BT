@@ -23,6 +23,10 @@
 // there is probably error on connection with UM34C
 #define UM34C_MAX_SEND_ERR_NUMB  10
 
+// Record current threshold values in centi Ampers (like cm but actully cA)
+#define UM34C_SRCT_MIN       0
+#define UM34C_SRCT_MAX      30  // 0.3 A
+#define UM34C_SRCT_DEFAULT  10  // 0.1 A
 
 
 
@@ -37,41 +41,37 @@
 	* 		f3: Prev
 	* 		f4: Reset Group
 	*/
+// https://sigrok.org/wiki/RDTech_UM_series
+typedef enum {
+    um34c_cmd_SDG_0 =        0xA0,  // Set Data Group - 0
+    um34c_cmd_SDG_1 =        0xA1,  // Set Data Group - 1
+    um34c_cmd_SDG_2 =        0xA2,  // Set Data Group - 2
+    um34c_cmd_SDG_3 =        0xA3,  // Set Data Group - 3
+    um34c_cmd_SDG_4 =        0xA4,  // Set Data Group - 4
+    um34c_cmd_SDG_5 =        0xA5,  // Set Data Group - 5
+    um34c_cmd_SDG_6 =        0xA6,  // Set Data Group - 6
+    um34c_cmd_SDG_7 =        0xA7,  // Set Data Group - 7
+    um34c_cmd_SDG_8 =        0xA8,  // Set Data Group - 8
+    um34c_cmd_SDG_9 =        0xA9,  // Set Data Group - 9
+    um34c_cmd_SRCT_Min = 0xB0,  // Set Record Current Threshold - 0.00 A
+    um34c_cmd_SRCT_Max = 0xCE,  // Set Record Current Threshold - 0.30 A
+    um34c_cmd_SB_Min =   0xD0,  // Set Brightness - Min
+    um34c_cmd_SB_Max =   0xD5,  // Set Brightness - Max
+    um34c_cmd_ST_OFF =      0xE0,  // Set Timeout - 0 min == OFF
+    um34c_cmd_ST_Min =      0xE1,  // Set Timeout - 1 min
+    um34c_cmd_ST_Max =      0xE9,  // Set Timeout - 9 min
+    um34c_cmd_getData =          0xF0,
+    um34c_cmd_nextScreen =             0xF1,
+    um34c_cmd_rotateClockwise =  0xF2,
+    um34c_cmd_prevScreen =             0xF3,
+    um34c_cmd_resetDataGroup =       0xF4,
+} um34c_cmd_E;
 
 typedef enum {
-    um34c_cmd_groupSel0 =        0xA0,
-    um34c_cmd_groupSel1 =        0xA1,
-    um34c_cmd_groupSel2 =        0xA2,
-    um34c_cmd_groupSel3 =        0xA3,
-    um34c_cmd_groupSel4 =        0xA4,
-    um34c_cmd_groupSel5 =        0xA5,
-    um34c_cmd_groupSel6 =        0xA6,
-    um34c_cmd_groupSel7 =        0xA7,
-    um34c_cmd_groupSel8 =        0xA8,
-    um34c_cmd_groupSel9 =        0xA9,
-    um34c_cmd_setRecordCurrent = 0xB0,
-    um34c_cmd_setBrightness0 =   0xD0,
-    um34c_cmd_setBrightness1 =   0xD1,
-    um34c_cmd_setBrightness2 =   0xD2,
-    um34c_cmd_setBrightness3 =   0xD3,
-    um34c_cmd_setBrightness4 =   0xD4,
-    um34c_cmd_setBrightness5 =   0xD5,
-    um34c_cmd_setTimeout0 =      0xE0,  // 0 min
-    um34c_cmd_setTimeout1 =      0xE1,  // 1 min
-    um34c_cmd_setTimeout2 =      0xE2,
-    um34c_cmd_setTimeout3 =      0xE3,
-    um34c_cmd_setTimeout4 =      0xE4,
-    um34c_cmd_setTimeout5 =      0xE5,
-    um34c_cmd_setTimeout6 =      0xE6,
-    um34c_cmd_setTimeout7 =      0xE7,
-    um34c_cmd_setTimeout8 =      0xE8,
-    um34c_cmd_setTimeout9 =      0xE9,
-    um34c_cmd_getData =          0xF0,
-    um34c_cmd_next =             0xF1,
-    um34c_cmd_rotateClockwise =  0xF2,
-    um34c_cmd_prev =             0xF3,
-    um34c_cmd_resetGroup =       0xF4,
-} um34c_cmd_E;
+    UM24C = 0x0963,
+    UM25C = 0x09c9,
+    UM34C = 0x0d4c
+} UM_C_devices_E;
 
 typedef struct {
     float fVoltage;
@@ -87,7 +87,14 @@ typedef struct {
     uint8_t byScreenTimeout;
     float fUsbDataPlus;
     float fUsbDataMinus;
-    uint8_t byChargingMode;
+    const char *pszChargingMode;
+    const char *pszModelID;
+    uint16_t wThreshold_mAh;  // mAh from threshold-based recording 
+    uint16_t wThreshold_mWh;  // mWh from threshold-based recording
+    uint8_t byThreshold_cA;  // Currently configured threshold for recording (in centiamps, divide by 100 to get A) 
+    uint8_t bThreshold_active;  // Threshold recording active (1 if recording, 0 if not) 
+    uint16_t wThreshold_duration;  //  Duration of threshold recording, in cumulative seconds 
+
     char szTimeDate[DATE_TIME_STRING_SIZE];  // "20:11:18 14/02/2020"
 } um34c_data_S;
 
@@ -114,10 +121,14 @@ uint8_t UM34C_bGetDestDevAddr(char *szUM34CAddress);
 uint8_t UM34C_bConnectToBtAddapter(um34c_config_S *pSUM34C_config);
 void createTimer(um34c_config_S *pSUM34C_config);
 void timer_handler (int signum);
+uint8_t UM34C_bMatchID(uint16_t wModeID);
 uint8_t UM34C_bGetData(um34c_config_S *pSConfig);
 void UM34C_sendCmd(int nSocketHandle, uint8_t byBuffSend, int *pnStatus);
 void UM34C_readCmd(int nSocketHandle, uint8_t *pabyBuff, size_t size, int *pnStatus);
-void UM34C_prettyPrintData(um34c_data_S *pSData, uint8_t bUseNcurses);
+const char *UM34C_getModelName(UM_C_devices_E EDevice);
+const char *UM34C_getChargingMode(uint8_t byChargingModeNumb);
+void UM34C_prettyPrintData(uint16_t *wY, uint16_t *wX, um34c_data_S *pSData, uint8_t bUseNcurses);
+void UM34C_prettyPrintSettings(uint16_t *wY, uint16_t *wX, um34c_data_S *pSData, uint8_t bUseNcurses);
 void UM34C_decodeData(uint8_t *buf, um34c_data_S *pSData);
 
 

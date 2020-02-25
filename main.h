@@ -4,6 +4,7 @@
 
 #include "um34c.h"
 #include "fileHandler.h"
+#include "movingAverage.h"
 
 #define RUNNING_TIME_STRING "%H:%M:%S"
 #define RUNNING_TIME_STRING_SIZE 10
@@ -11,6 +12,7 @@
 #define INTREVAL_CHECK_FOR_CHAR (50*1000)  // [us]
 #define INTREVAL_UPDATE_DISPLAY (20*1000)  // [us]
 
+#define MOV_AVG_DFLT_FILTER_STRENGTH  (10)
 #define ms_TO_us(ms)  ((ms)*1000)
 
 // ncurses color pair index
@@ -29,14 +31,20 @@ typedef struct {
     int nCmdChar;
     int nCmdChar_prev;
     uint8_t byDeviceBrightness;
+    uint8_t byRecCurrThreshold_cA;
     uint8_t byCurrentScreenRotation;
     uint8_t bUpdateDisp;
-    char szLastCmdBuff[40];
+    char szLastCmdBuff[100];
+    movingAvg_handle_f_S SMvgAvg_handle_fVoltage;
+    movingAvg_handle_f_S SMvgAvg_handle_fCurrent;
+    uint16_t wMovAvgStrength;
+    uint8_t bShowHelp;
 } mainConfig_S;
 
 typedef enum {
   exitProgram_param_OK = 0,
   exitProgram_param_SendingUM34C,
+  exitProgram_param_SettingRCT,  // Record Current Threshold
   exitProgram_param_CTRL_C,
   exitProgram_param_C,
   exitProgram_param_terminalColor,
