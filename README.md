@@ -28,7 +28,7 @@ It was tested on Ubuntu 18.04 and on Raspbian (Raspberry Pi Zero W and 3b+).
 `build/um34c -r`  
 * Start reading device and saving data to CSV file on startup:  
 `build/um34c -r -csv`  
-* Append average from X samples of voltage and current to CSV file (in this case every 20 samples average is appended to CSV file and becasue we set query interval to 500ms every 10 seconds value is appended to CSV file):  
+* Append average from `x` samples of voltage and current to CSV file (in this case every average from 20 samples is appended to CSV file and becasue we set query interval to 500ms this means that every 10 seconds value is appended to CSV file):  
 `build/um34c -f 20 -q 500`
 * Set record current threshold in cA (at which current measuring mAh and mWh starts). Here we set it to 5cA which is 0.05A:
 `build/um34c -i 5`
