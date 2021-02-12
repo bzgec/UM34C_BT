@@ -29,12 +29,12 @@ uint8_t bReadDevAddrFromFile(char *pszDevAddr) {
             if(i == UM34C_ADDR_LEN-1) {
                 bAddressStoredInFile = TRUE;
             } else {
-                logger(log_lvl_warning, "fileHandler", "Stored UM34C address in '%s' is not correct: '%s'", UM34C_ADDR_FILE_NAME, pszDevAddr);
+                logger_main(log_lvl_warning, "fileHandler", "Stored UM34C address in '%s' is not correct: '%s'", UM34C_ADDR_FILE_NAME, pszDevAddr);
             }
 
             fclose(fp);
         } else {
-            logger(log_lvl_error, "fileHandler", "Reading device address file - failed to open '%s'", UM34C_ADDR_FILE_NAME);
+            logger_main(log_lvl_error, "fileHandler", "Reading device address file - failed to open '%s'", UM34C_ADDR_FILE_NAME);
         }
     }
 
@@ -51,7 +51,7 @@ void storeDevAddrToFile(char *pszDevAddr) {
             fprintf(fp, "%s", pszDevAddr);
             fclose(fp);
         } else {
-            logger(log_lvl_error, "fileHandler", "Storing UM34C address to file - failed to open '%s', device address '%s'",
+            logger_main(log_lvl_error, "fileHandler", "Storing UM34C address to file - failed to open '%s', device address '%s'",
                    UM34C_ADDR_FILE_NAME, pszDevAddr);
         }
     }
@@ -79,7 +79,7 @@ uint8_t bMakeNewCSVfile(fileHandler_config_S *pSConfig) {
             bRetVal = TRUE;
             fclose(fp);
         } else {
-            logger(log_lvl_error, "fileHandler", "Creating new CSV file - failed to open '%s'", pSConfig->szCSVfileName);
+            logger_main(log_lvl_error, "fileHandler", "Creating new CSV file - failed to open '%s'", pSConfig->szCSVfileName);
         }
     }
 
@@ -130,7 +130,7 @@ fileHandler_info_E byAppendToCSVfile(fileHandler_config_S *pSConfig, um34c_data_
             fclose(fp);
         } else {
             ERetVal = fileHandler_info_FAILED_TO_OPEN_FILE;
-            logger(log_lvl_error, "fileHandler", "Appending to file - failed to open '%s'", pSConfig->szCSVfileName);
+            logger_main(log_lvl_error, "fileHandler", "Appending to file - failed to open '%s'", pSConfig->szCSVfileName);
         }
     } else {
         ERetVal = fileHandler_info_NULL;
@@ -159,7 +159,7 @@ long int getFileSize(char *pszFileName) {
 
             if(size == -1) {
                 retVal = -1;
-                logger(log_lvl_error, "fileHandler", "Failed to find end position of '%s'", pszFileName);
+                logger_main(log_lvl_error, "fileHandler", "Failed to find end position of '%s'", pszFileName);
             } else {
                 retVal = size;
             }
@@ -167,7 +167,7 @@ long int getFileSize(char *pszFileName) {
             fclose(fp);
 
         } else {
-            logger(log_lvl_error, "fileHandler", "Trying to get file size - failed to open '%s'", pszFileName);
+            logger_main(log_lvl_error, "fileHandler", "Trying to get file size - failed to open '%s'", pszFileName);
         }  
     }
 
