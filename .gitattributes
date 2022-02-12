@@ -1,0 +1,34 @@
+# For information about this file check https://git-scm.com/docs/gitattributes
+
+################################################################################
+# Project specific files
+################################################################################
+
+################################################################################
+# Standard files
+*.sh              text eol=lf
+*.c               text eol=lf
+*.h               text eol=lf
+*.py              text eol=lf
+*.md              text eol=lf
+*.adoc            text eol=lf
+*.txt             text eol=lf
+*.csv             text eol=lf
+*.json            text eol=lf
+*.vim             text eol=lf
+*.adoc            text eol=lf
+*.rst             text eol=lf
+*.html            text eol=lf
+*.css             text eol=lf
+*.js              text eol=lf
+*.toml            text eol=lf
+
+Makefile          text eol=lf
+
+Dockerfile        text eol=lf
+.dockerignore     text eol=lf
+
+.gitignore        text eol=lf
+.gitmodules       text eol=lf
+.gitattributes    text eol=lf
+################################################################################
